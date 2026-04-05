@@ -1,0 +1,195 @@
+{
+  "nodes": [
+    {
+      "id": "100001",
+      "type": "1",
+      "meta": {
+        "position": { "x": 0, "y": 0 }
+      },
+      "data": {
+        "nodeMeta": {
+          "title": "Start",
+          "description": "Receives the user query for knowledge retrieval.",
+          "icon": "icon-Start-v2.jpg",
+          "subTitle": ""
+        },
+        "outputs": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "description": "The user's query to search the knowledge base"
+          }
+        ]
+      }
+    },
+    {
+      "id": "200001",
+      "type": "6",
+      "meta": {
+        "position": { "x": 460, "y": 0 }
+      },
+      "data": {
+        "nodeMeta": {
+          "title": "Knowledge Retrieval",
+          "description": "Searches the knowledge base for relevant documents.",
+          "icon": "icon-Dataset-v2.jpg",
+          "subTitle": "Dataset"
+        },
+        "inputs": {
+          "inputParameters": [
+            {
+              "name": "Query",
+              "input": {
+                "type": "string",
+                "value": {
+                  "type": "ref",
+                  "content": {
+                    "source": "block-output",
+                    "blockID": "100001",
+                    "name": "query"
+                  }
+                }
+              }
+            }
+          ],
+          "datasetParam": [
+            {
+              "name": "datasetList",
+              "input": {
+                "type": "list",
+                "schema": { "type": "string" },
+                "value": { "type": "literal", "content": ["CUSTOMIZE_DATASET_ID"] }
+              }
+            },
+            { "name": "topK", "input": { "type": "integer", "value": { "type": "literal", "content": 3 } } },
+            { "name": "minScore", "input": { "type": "float", "value": { "type": "literal", "content": 0.5 } } },
+            { "name": "strategy", "input": { "type": "integer", "value": { "type": "literal", "content": 0 } } },
+            { "name": "useRerank", "input": { "type": "boolean", "value": { "type": "literal", "content": false } } },
+            { "name": "useRewrite", "input": { "type": "boolean", "value": { "type": "literal", "content": false } } },
+            { "name": "isPersonalOnly", "input": { "type": "boolean", "value": { "type": "literal", "content": false } } },
+            { "name": "useNl2sql", "input": { "type": "boolean", "value": { "type": "literal", "content": false } } }
+          ]
+        },
+        "outputs": [
+          {
+            "name": "outputList",
+            "type": "list",
+            "schema": {
+              "type": "object",
+              "schema": [
+                { "name": "output", "type": "string" },
+                { "name": "documentId", "type": "string" }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "200002",
+      "type": "3",
+      "meta": {
+        "position": { "x": 920, "y": 0 }
+      },
+      "data": {
+        "nodeMeta": {
+          "title": "LLM with Context",
+          "description": "Generates a response using retrieved knowledge as context.",
+          "icon": "icon-LLM-v2.jpg",
+          "mainColor": "#5C62FF",
+          "subTitle": "LLM"
+        },
+        "inputs": {
+          "inputParameters": [
+            {
+              "name": "query",
+              "input": {
+                "type": "string",
+                "value": {
+                  "type": "ref",
+                  "content": {
+                    "source": "block-output",
+                    "blockID": "100001",
+                    "name": "query"
+                  }
+                }
+              }
+            },
+            {
+              "name": "knowledge_results",
+              "input": {
+                "type": "string",
+                "value": {
+                  "type": "ref",
+                  "content": {
+                    "source": "block-output",
+                    "blockID": "200001",
+                    "name": "outputList"
+                  }
+                }
+              }
+            }
+          ],
+          "llmParam": [
+            { "name": "modelType", "input": { "type": "string", "value": { "type": "literal", "content": "YOUR_MODEL_TYPE" } } },
+            { "name": "modleName", "input": { "type": "string", "value": { "type": "literal", "content": "YOUR_MODEL_NAME" } } },
+            { "name": "temperature", "input": { "type": "string", "value": { "type": "literal", "content": "0.5" } } },
+            { "name": "maxTokens", "input": { "type": "string", "value": { "type": "literal", "content": "4096" } } },
+            { "name": "responseFormat", "input": { "type": "string", "value": { "type": "literal", "content": "0" } } },
+            { "name": "systemPrompt", "input": { "type": "string", "value": { "type": "literal", "content": "CUSTOMIZE: You are a helpful assistant. Answer the user's question based on the provided context. If the context does not contain relevant information, say so." } } },
+            { "name": "prompt", "input": { "type": "string", "value": { "type": "literal", "content": "Context:\n{{knowledge_results}}\n\nQuestion: {{query}}" } } },
+            { "name": "enableChatHistory", "input": { "type": "string", "value": { "type": "literal", "content": false } } },
+            { "name": "chatHistoryRound", "input": { "type": "string", "value": { "type": "literal", "content": "3" } } }
+          ]
+        },
+        "outputs": [
+          { "name": "output", "type": "string" }
+        ],
+        "version": "3"
+      }
+    },
+    {
+      "id": "900001",
+      "type": "2",
+      "meta": {
+        "position": { "x": 1380, "y": 0 }
+      },
+      "data": {
+        "nodeMeta": {
+          "title": "End",
+          "description": "Returns the RAG-generated answer.",
+          "icon": "icon-End-v2.jpg",
+          "subTitle": ""
+        },
+        "inputs": {
+          "terminatePlan": "returnVariables",
+          "inputParameters": [
+            {
+              "name": "output",
+              "input": {
+                "type": "string",
+                "value": {
+                  "type": "ref",
+                  "content": {
+                    "source": "block-output",
+                    "blockID": "200002",
+                    "name": "output"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "sourceNodeID": "100001", "targetNodeID": "200001", "sourcePortID": "", "targetPortID": "" },
+    { "sourceNodeID": "200001", "targetNodeID": "200002", "sourcePortID": "", "targetPortID": "" },
+    { "sourceNodeID": "200002", "targetNodeID": "900001", "sourcePortID": "", "targetPortID": "" }
+  ],
+  "versions": {
+    "loop": "v2"
+  }
+}
