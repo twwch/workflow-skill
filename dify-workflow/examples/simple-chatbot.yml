@@ -1,0 +1,143 @@
+# Simple Chatbot -- minimal chatflow with Start -> LLM -> Answer
+# Mode: advanced-chat (Chatflow)
+# Model: gpt-4o-mini
+# This is a complete, importable Dify DSL file.
+
+version: "0.6.0"
+kind: app
+app:
+  name: "Simple Chatbot"
+  mode: advanced-chat
+  icon: "\U0001F916"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "A minimal chatbot that answers user questions using GPT-4o-mini."
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: "Hello! How can I help you today?"
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+      - "What can you help me with?"
+      - "Tell me a fun fact."
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: "1711536487001-source-1711536522001-target"
+        source: "1711536487001"
+        sourceHandle: source
+        target: "1711536522001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: start
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+      - id: "1711536522001-source-1711536558001-target"
+        source: "1711536522001"
+        sourceHandle: source
+        target: "1711536558001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: llm
+          targetType: answer
+          isInIteration: false
+          isInLoop: false
+    nodes:
+      # ── Start ──
+      - id: "1711536487001"
+        type: custom
+        position:
+          x: 80
+          y: 282
+        positionAbsolute:
+          x: 80
+          y: 282
+        width: 244
+        height: 54
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables: []
+
+      # ── LLM ──
+      - id: "1711536522001"
+        type: custom
+        position:
+          x: 380
+          y: 282
+        positionAbsolute:
+          x: 380
+          y: 282
+        width: 244
+        height: 98
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: llm
+          title: LLM
+          desc: ""
+          model:
+            provider: "langgenius/openai/openai"
+            name: "gpt-4o-mini"
+            mode: "chat"
+            completion_params:
+              temperature: 0.7
+          prompt_template:
+            - role: "system"
+              text: "You are a helpful assistant. Answer the user's questions clearly and concisely."
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window:
+              enabled: false
+              size: 10
+
+      # ── Answer ──
+      - id: "1711536558001"
+        type: custom
+        position:
+          x: 680
+          y: 282
+        positionAbsolute:
+          x: 680
+          y: 282
+        width: 244
+        height: 48
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: answer
+          title: Answer
+          desc: ""
+          answer: "{{#1711536522001.text#}}"
+          variables: []
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

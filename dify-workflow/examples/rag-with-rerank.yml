@@ -1,0 +1,278 @@
+# RAG with Reranking -- chatflow with knowledge retrieval, conditional check, and LLM answer
+# Flow: Start -> Knowledge Retrieval -> If/Else (has results?) -> LLM -> Answer
+#                                                               \-> Answer (no results)
+# Mode: advanced-chat (Chatflow)
+# This is a complete, importable Dify DSL file.
+
+version: "0.6.0"
+kind: app
+app:
+  name: "RAG with Reranking"
+  mode: advanced-chat
+  icon: "\U0001F4DA"
+  icon_background: "#E4FBCC"
+  icon_type: emoji
+  description: "A RAG chatbot that retrieves knowledge with reranking, checks for results, and generates an answer."
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: "Ask me anything about the knowledge base!"
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      # Start -> Knowledge Retrieval
+      - id: "1711538001001-source-1711538002001-target"
+        source: "1711538001001"
+        sourceHandle: source
+        target: "1711538002001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: start
+          targetType: knowledge-retrieval
+          isInIteration: false
+          isInLoop: false
+
+      # Knowledge Retrieval -> If/Else
+      - id: "1711538002001-source-1711538003001-target"
+        source: "1711538002001"
+        sourceHandle: source
+        target: "1711538003001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: knowledge-retrieval
+          targetType: if-else
+          isInIteration: false
+          isInLoop: false
+
+      # If/Else (true: has results) -> LLM
+      - id: "1711538003001-true-1711538004001-target"
+        source: "1711538003001"
+        sourceHandle: "true"
+        target: "1711538004001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: if-else
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+
+      # If/Else (false: no results) -> Answer (fallback)
+      - id: "1711538003001-false-1711538006001-target"
+        source: "1711538003001"
+        sourceHandle: "false"
+        target: "1711538006001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: if-else
+          targetType: answer
+          isInIteration: false
+          isInLoop: false
+
+      # LLM -> Answer (main)
+      - id: "1711538004001-source-1711538005001-target"
+        source: "1711538004001"
+        sourceHandle: source
+        target: "1711538005001"
+        targetHandle: target
+        type: custom
+        zIndex: 0
+        data:
+          sourceType: llm
+          targetType: answer
+          isInIteration: false
+          isInLoop: false
+
+    nodes:
+      # ── Start ──
+      - id: "1711538001001"
+        type: custom
+        position:
+          x: 80
+          y: 282
+        positionAbsolute:
+          x: 80
+          y: 282
+        width: 244
+        height: 54
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables: []
+
+      # ── Knowledge Retrieval ──
+      - id: "1711538002001"
+        type: custom
+        position:
+          x: 380
+          y: 282
+        positionAbsolute:
+          x: 380
+          y: 282
+        width: 244
+        height: 108
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: knowledge-retrieval
+          title: Knowledge Retrieval
+          desc: "Search knowledge bases with reranking enabled"
+          query_variable_selector:
+            - sys
+            - query
+          dataset_ids:
+            - "a]1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          retrieval_mode: "multiple"
+          multiple_retrieval_config:
+            top_k: 5
+            score_threshold: 0.5
+            reranking_enable: true
+            reranking_mode: "reranking_model"
+            reranking_model:
+              provider: "langgenius/cohere/cohere"
+              model: "rerank-english-v3.0"
+
+      # ── If/Else: Check retrieval results ──
+      - id: "1711538003001"
+        type: custom
+        position:
+          x: 680
+          y: 282
+        positionAbsolute:
+          x: 680
+          y: 282
+        width: 244
+        height: 126
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: if-else
+          title: "Has Results?"
+          desc: "Check whether knowledge retrieval returned any results"
+          cases:
+            - case_id: "true"
+              logical_operator: and
+              conditions:
+                - id: "c0a1b2c3-d4e5-6789-0abc-def012345678"
+                  varType: "array[object]"
+                  variable_selector:
+                    - "1711538002001"
+                    - result
+                  comparison_operator: "not empty"
+                  value: ""
+
+      # ── LLM: Generate answer from context ──
+      - id: "1711538004001"
+        type: custom
+        position:
+          x: 980
+          y: 182
+        positionAbsolute:
+          x: 980
+          y: 182
+        width: 244
+        height: 98
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: llm
+          title: "Generate Answer"
+          desc: "Answer the user query using retrieved knowledge context"
+          model:
+            provider: "langgenius/openai/openai"
+            name: "gpt-4o"
+            mode: "chat"
+            completion_params:
+              temperature: 0.3
+              max_tokens: 2048
+          prompt_template:
+            - role: "system"
+              text: |
+                You are a knowledgeable assistant. Answer the user's question based on the following context retrieved from the knowledge base.
+
+                If the context does not contain enough information to fully answer the question, say so honestly and provide what you can.
+
+                {{#context#}}
+          variables: []
+          context:
+            enabled: true
+            variable_selector:
+              - "1711538002001"
+              - result
+          vision:
+            enabled: false
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window:
+              enabled: true
+              size: 10
+
+      # ── Answer: Main response (from LLM) ──
+      - id: "1711538005001"
+        type: custom
+        position:
+          x: 1280
+          y: 182
+        positionAbsolute:
+          x: 1280
+          y: 182
+        width: 244
+        height: 48
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: answer
+          title: Answer
+          desc: "Stream the LLM-generated response to the user"
+          answer: "{{#1711538004001.text#}}"
+          variables: []
+
+      # ── Answer: Fallback (no results) ──
+      - id: "1711538006001"
+        type: custom
+        position:
+          x: 980
+          y: 382
+        positionAbsolute:
+          x: 980
+          y: 382
+        width: 244
+        height: 48
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: answer
+          title: "No Results"
+          desc: "Fallback response when no knowledge base results are found"
+          answer: "I'm sorry, I couldn't find any relevant information in the knowledge base for your question. Could you try rephrasing or asking something else?"
+          variables: []
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
