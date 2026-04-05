@@ -1,0 +1,231 @@
+# Agent Template: Start -> LLM (with tools) -> Tool -> LLM -> Answer
+# An agent-style workflow where the first LLM decides what to search,
+# a tool executes the search, and a second LLM synthesizes the final answer.
+#
+# Mode: advanced-chat (Chatflow)
+# Flow: Start -> LLM (Plan) -> Tool (Search) -> LLM (Synthesize) -> Answer
+
+version: "0.6.0"
+kind: app
+app:
+  # CUSTOMIZE: Change the app name and description
+  name: "Agent Workflow"
+  mode: advanced-chat
+  icon: "\U0001F9E0"
+  icon_background: "#D5F5F6"
+  icon_type: emoji
+  description: "An agent workflow that uses tools to answer questions."
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: c1d2e3f4-source-g5h6i7j8-target
+        source: "c1d2e3f4-8a9b-4c0d-ae1f-2a3b4c5d6e7f"
+        sourceHandle: source
+        target: "g5h6i7j8-9b0c-4d1e-bf2a-3b4c5d6e7f8a"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: start
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: g5h6i7j8-source-k9l0m1n2-target
+        source: "g5h6i7j8-9b0c-4d1e-bf2a-3b4c5d6e7f8a"
+        sourceHandle: source
+        target: "k9l0m1n2-0c1d-4e2f-ca3b-4c5d6e7f8a9b"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: llm
+          targetType: tool
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: k9l0m1n2-source-o3p4q5r6-target
+        source: "k9l0m1n2-0c1d-4e2f-ca3b-4c5d6e7f8a9b"
+        sourceHandle: source
+        target: "o3p4q5r6-1d2e-4f3a-db4c-5d6e7f8a9b0c"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: tool
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: o3p4q5r6-source-s7t8u9v0-target
+        source: "o3p4q5r6-1d2e-4f3a-db4c-5d6e7f8a9b0c"
+        sourceHandle: source
+        target: "s7t8u9v0-2e3f-4a4b-ec5d-6e7f8a9b0c1d"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+    nodes:
+      # --- Start Node ---
+      - id: "c1d2e3f4-8a9b-4c0d-ae1f-2a3b4c5d6e7f"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 80
+          y: 282
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables: []
+
+      # --- LLM Node (Plan / Extract Search Query) ---
+      - id: "g5h6i7j8-9b0c-4d1e-bf2a-3b4c5d6e7f8a"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 380
+          y: 282
+        data:
+          type: llm
+          title: Plan
+          desc: "Extract a search query from the user's question."
+          model:
+            # CUSTOMIZE: Set your model provider and name
+            provider: ""
+            name: ""
+            mode: chat
+            completion_params:
+              temperature: 0.3
+          prompt_template:
+            - role: system
+              # CUSTOMIZE: Adjust the planning prompt
+              text: |
+                You are a search query planner. Given the user's question,
+                extract a concise search query that would find the most relevant information.
+                Output ONLY the search query text, nothing else.
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window:
+              enabled: false
+              size: 10
+
+      # --- Tool Node (Web Search) ---
+      - id: "k9l0m1n2-0c1d-4e2f-ca3b-4c5d6e7f8a9b"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 680
+          y: 282
+        data:
+          type: tool
+          title: Web Search
+          desc: "Search the web using the planned query."
+          # CUSTOMIZE: Set the tool provider and name for your search tool
+          provider_id: langgenius/duckduckgo/duckduckgo
+          provider_type: builtin
+          provider_name: duckduckgo
+          tool_name: ddg_search
+          tool_label: DuckDuckGo Search
+          tool_node_version: "2"
+          tool_parameters:
+            query:
+              type: variable
+              value:
+                - "g5h6i7j8-9b0c-4d1e-bf2a-3b4c5d6e7f8a"
+                - text
+            # CUSTOMIZE: Adjust max_results as needed
+            max_results:
+              type: constant
+              value: "5"
+          tool_configurations: {}
+
+      # --- LLM Node (Synthesize Final Answer) ---
+      - id: "o3p4q5r6-1d2e-4f3a-db4c-5d6e7f8a9b0c"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 980
+          y: 282
+        data:
+          type: llm
+          title: Synthesize
+          desc: "Synthesize a final answer from the search results."
+          model:
+            # CUSTOMIZE: Set your model provider and name
+            provider: ""
+            name: ""
+            mode: chat
+            completion_params:
+              # CUSTOMIZE: Adjust temperature
+              temperature: 0.7
+          prompt_template:
+            - role: system
+              # CUSTOMIZE: Adjust the synthesis prompt
+              text: |
+                You are a helpful assistant. Use the following search results
+                to answer the user's question accurately and concisely.
+                If the search results are not relevant, say you could not find the information.
+
+                Search results:
+                {{#k9l0m1n2-0c1d-4e2f-ca3b-4c5d6e7f8a9b.text#}}
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window:
+              enabled: false
+              size: 10
+
+      # --- Answer Node ---
+      - id: "s7t8u9v0-2e3f-4a4b-ec5d-6e7f8a9b0c1d"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 1280
+          y: 282
+        data:
+          type: answer
+          title: Answer
+          desc: ""
+          answer: "{{#o3p4q5r6-1d2e-4f3a-db4c-5d6e7f8a9b0c.text#}}"
+          variables: []
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

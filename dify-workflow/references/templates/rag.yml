@@ -1,0 +1,175 @@
+# RAG Template: Start -> Knowledge Retrieval -> LLM (with context) -> Answer
+# Retrieves relevant documents from a knowledge base and uses them as context for the LLM.
+#
+# Mode: advanced-chat (Chatflow)
+# Flow: Start -> Knowledge Retrieval -> LLM -> Answer
+
+version: "0.6.0"
+kind: app
+app:
+  # CUSTOMIZE: Change the app name and description
+  name: "RAG Chatbot"
+  mode: advanced-chat
+  icon: "\U0001F4DA"
+  icon_background: "#E4FBCC"
+  icon_type: emoji
+  description: "A chatbot that answers questions using knowledge base retrieval."
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      # CUSTOMIZE: Set to true to show citation sources in the answer
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: b1a2b3c4-source-d4e5f6a7-target
+        source: "b1a2b3c4-4d5e-4f6a-8b7c-9d0e1f2a3b4c"
+        sourceHandle: source
+        target: "d4e5f6a7-5e6f-4a7b-9c8d-0e1f2a3b4c5d"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: start
+          targetType: knowledge-retrieval
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: d4e5f6a7-source-f7a8b9c0-target
+        source: "d4e5f6a7-5e6f-4a7b-9c8d-0e1f2a3b4c5d"
+        sourceHandle: source
+        target: "f7a8b9c0-6f7a-4b8c-ad9e-1f2a3b4c5d6e"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: knowledge-retrieval
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: f7a8b9c0-source-a0b1c2d3-target
+        source: "f7a8b9c0-6f7a-4b8c-ad9e-1f2a3b4c5d6e"
+        sourceHandle: source
+        target: "a0b1c2d3-7a8b-4c9d-be0f-2a3b4c5d6e7f"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: llm
+          targetType: answer
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+    nodes:
+      # --- Start Node ---
+      - id: "b1a2b3c4-4d5e-4f6a-8b7c-9d0e1f2a3b4c"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 80
+          y: 282
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables: []
+
+      # --- Knowledge Retrieval Node ---
+      - id: "d4e5f6a7-5e6f-4a7b-9c8d-0e1f2a3b4c5d"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 380
+          y: 282
+        data:
+          type: knowledge-retrieval
+          title: Knowledge Retrieval
+          desc: ""
+          query_variable_selector:
+            - sys
+            - query
+          # CUSTOMIZE: Replace with your knowledge base (dataset) UUIDs
+          dataset_ids:
+            - "YOUR-DATASET-UUID-HERE"
+          retrieval_mode: multiple
+          multiple_retrieval_config:
+            # CUSTOMIZE: Adjust top_k and score_threshold
+            top_k: 4
+            score_threshold: null
+            reranking_enable: false
+
+      # --- LLM Node (with context) ---
+      - id: "f7a8b9c0-6f7a-4b8c-ad9e-1f2a3b4c5d6e"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 680
+          y: 282
+        data:
+          type: llm
+          title: LLM
+          desc: ""
+          model:
+            # CUSTOMIZE: Set your model provider and name
+            provider: ""
+            name: ""
+            mode: chat
+            completion_params:
+              # CUSTOMIZE: Lower temperature recommended for RAG (factual answers)
+              temperature: 0.3
+          prompt_template:
+            - role: system
+              # CUSTOMIZE: Write your system prompt; use {{#context#}} to inject retrieved documents
+              text: |
+                Answer the user's question based on the following context.
+                If the context does not contain relevant information, say you don't know.
+
+                {{#context#}}
+          variables: []
+          context:
+            enabled: true
+            variable_selector:
+              - "d4e5f6a7-5e6f-4a7b-9c8d-0e1f2a3b4c5d"
+              - result
+          vision:
+            enabled: false
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window:
+              enabled: false
+              size: 10
+
+      # --- Answer Node ---
+      - id: "a0b1c2d3-7a8b-4c9d-be0f-2a3b4c5d6e7f"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 980
+          y: 282
+        data:
+          type: answer
+          title: Answer
+          desc: ""
+          answer: "{{#f7a8b9c0-6f7a-4b8c-ad9e-1f2a3b4c5d6e.text#}}"
+          variables: []
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7

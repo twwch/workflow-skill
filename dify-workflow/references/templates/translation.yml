@@ -1,0 +1,209 @@
+# Translation Template: Start -> LLM (Detect Language) -> LLM (Translate) -> Answer
+# Detects the source language, then translates the text to the target language.
+#
+# Mode: workflow
+# Flow: Start -> LLM (Detect) -> LLM (Translate) -> End
+
+version: "0.6.0"
+kind: app
+app:
+  # CUSTOMIZE: Change the app name and description
+  name: "Translation Workflow"
+  mode: workflow
+  icon: "\U0001F310"
+  icon_background: "#E4E7EC"
+  icon_type: emoji
+  description: "Detects the source language and translates text to a target language."
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ""
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+  graph:
+    edges:
+      - id: d1e2f3a4-source-h5i6j7k8-target
+        source: "d1e2f3a4-5a6b-4c7d-8e9f-0a1b2c3d4e5f"
+        sourceHandle: source
+        target: "h5i6j7k8-6b7c-4d8e-9f0a-1b2c3d4e5f6a"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: start
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: h5i6j7k8-source-l9m0n1o2-target
+        source: "h5i6j7k8-6b7c-4d8e-9f0a-1b2c3d4e5f6a"
+        sourceHandle: source
+        target: "l9m0n1o2-7c8d-4e9f-a01b-2c3d4e5f6a7b"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: llm
+          targetType: llm
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+      - id: l9m0n1o2-source-p3q4r5s6-target
+        source: "l9m0n1o2-7c8d-4e9f-a01b-2c3d4e5f6a7b"
+        sourceHandle: source
+        target: "p3q4r5s6-8d9e-4f0a-b12c-3d4e5f6a7b8c"
+        targetHandle: target
+        type: custom
+        data:
+          sourceType: llm
+          targetType: end
+          isInIteration: false
+          isInLoop: false
+        zIndex: 0
+    nodes:
+      # --- Start Node ---
+      - id: "d1e2f3a4-5a6b-4c7d-8e9f-0a1b2c3d4e5f"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 80
+          y: 282
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            # CUSTOMIZE: Adjust the input variables as needed
+            - variable: text
+              label: Text to Translate
+              type: paragraph
+              required: true
+              max_length: 5000
+            - variable: target_language
+              label: Target Language
+              type: select
+              required: true
+              # CUSTOMIZE: Add or remove language options
+              options:
+                - English
+                - Chinese
+                - Spanish
+                - French
+                - German
+                - Japanese
+                - Korean
+              default: English
+
+      # --- LLM Node (Detect Language) ---
+      - id: "h5i6j7k8-6b7c-4d8e-9f0a-1b2c3d4e5f6a"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 380
+          y: 282
+        data:
+          type: llm
+          title: Detect Language
+          desc: "Detect the source language of the input text."
+          model:
+            # CUSTOMIZE: Set your model provider and name
+            provider: ""
+            name: ""
+            mode: chat
+            completion_params:
+              temperature: 0.0
+          prompt_template:
+            - role: system
+              text: |
+                You are a language detection expert.
+                Identify the language of the given text.
+                Output ONLY the language name in English (e.g., "English", "Chinese", "Spanish").
+                Do not include any other text.
+            - role: user
+              text: "{{#d1e2f3a4-5a6b-4c7d-8e9f-0a1b2c3d4e5f.text#}}"
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # --- LLM Node (Translate) ---
+      - id: "l9m0n1o2-7c8d-4e9f-a01b-2c3d4e5f6a7b"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 680
+          y: 282
+        data:
+          type: llm
+          title: Translate
+          desc: "Translate the text from the detected language to the target language."
+          model:
+            # CUSTOMIZE: Set your model provider and name
+            provider: ""
+            name: ""
+            mode: chat
+            completion_params:
+              # CUSTOMIZE: Lower temperature recommended for translation accuracy
+              temperature: 0.3
+          prompt_template:
+            - role: system
+              # CUSTOMIZE: Adjust the translation prompt
+              text: |
+                You are a professional translator.
+                The source text is in {{#h5i6j7k8-6b7c-4d8e-9f0a-1b2c3d4e5f6a.text#}}.
+                Translate the following text into {{#d1e2f3a4-5a6b-4c7d-8e9f-0a1b2c3d4e5f.target_language#}}.
+                Preserve the original meaning, tone, and formatting.
+                Output ONLY the translated text, nothing else.
+            - role: user
+              text: "{{#d1e2f3a4-5a6b-4c7d-8e9f-0a1b2c3d4e5f.text#}}"
+          variables: []
+          context:
+            enabled: false
+            variable_selector: []
+          vision:
+            enabled: false
+
+      # --- End Node ---
+      - id: "p3q4r5s6-8d9e-4f0a-b12c-3d4e5f6a7b8c"
+        type: custom
+        sourcePosition: right
+        targetPosition: left
+        position:
+          x: 980
+          y: 282
+        data:
+          type: end
+          title: End
+          desc: ""
+          outputs:
+            - variable: translated_text
+              value_selector:
+                - "l9m0n1o2-7c8d-4e9f-a01b-2c3d4e5f6a7b"
+                - text
+              value_type: string
+            - variable: detected_language
+              value_selector:
+                - "h5i6j7k8-6b7c-4d8e-9f0a-1b2c3d4e5f6a"
+                - text
+              value_type: string
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.7
