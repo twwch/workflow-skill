@@ -32,30 +32,55 @@ Before generating, assess whether the user's description is sufficient:
 
 ## Node Type Reference
 
-### Verified node types (confirmed importable on coze.cn)
-
-| YAML Type | Purpose | Confirmed |
-|-----------|---------|-----------|
-| `start` | Entry point; defines workflow input variables | ✅ |
-| `end` | Terminal node; collects outputs | ✅ |
-| `llm` | Invokes a large language model | ✅ |
-| `loop` | Iterates over array with inner sub-nodes | ✅ |
-| `plugin` | Executes a registered plugin/tool | ✅ |
-| `variable_merge` | Merges variables from multiple branches | ✅ |
-| `image_generate` | Generates images from prompts | ✅ |
-
-### Additional types (from source code, not yet verified)
+### Core node types (all verified from real coze.cn export)
 
 | YAML Type | Purpose |
 |-----------|---------|
-| `code` | Runs Python/JavaScript code |
-| `selector` | Conditional branching (IF/ELIF/ELSE) |
-| `intent_detector` | LLM-based intent classification |
+| `start` | Entry point; defines workflow input variables |
+| `end` | Terminal node; collects outputs |
+| `llm` | Invokes a large language model |
+| `loop` | Iterates over array with inner sub-nodes |
+| `plugin` | Executes a registered plugin/tool |
+| `variable_merge` | Merges variables from multiple branches |
+| `image_generate` | Generates images from prompts |
+| `code` | Run Python (language: 3) / TypeScript (language: 5) |
+| `http` | HTTP API calls (GET/POST/PUT/DELETE) |
+| `condition` | Conditional branching (IF/ELIF/ELSE) |
+| `intent` | LLM-based intent classification |
 | `knowledge` | Knowledge base search |
-| `http_requester` | HTTP API calls |
-| `batch` | Parallel array processing |
-| `text_processor` | String concat/split |
+| `text` | Text concat/split |
 | `question` | Pause for user input |
+| `batch` | Parallel array processing |
+| `subflow` | Sub-workflow call |
+
+### Additional node types (verified from real coze.cn export)
+
+| YAML Type | Purpose | Builder Function |
+|-----------|---------|-----------------|
+| `code` | Run Python/TypeScript code | `code_node()` |
+| `http` | HTTP API calls | `http_node()` |
+| `condition` | Conditional branching (IF/ELSE) | `selector_node()` |
+| `intent` | LLM-based intent classification | `intent_node()` |
+| `knowledge` | Knowledge base search | `knowledge_node()` |
+| `subflow` | Sub-workflow call | — |
+| `batch` | Parallel array processing | — |
+| `text` | Text concat/split | — |
+| `question` | Pause for user input | — |
+| `to_json` | JSON serialize | — |
+| `from_json` | JSON deserialize | — |
+| `assign_variable` | Variable assignment | — |
+| `database` | SQL custom query | — |
+| `insert_record` / `update_record` / `select_record` / `delete_record` | DB CRUD | — |
+| `dataset_write` / `dataset_delete` | Knowledge write/delete | — |
+| `image_generate` / `drawing_board` | Image generation | — |
+| `video_generation` / `video_audio_extractor` / `video_frame_extractor` | Video | — |
+| `conversation_create` / `conversation_update` / `conversation_delete` / `conversation_list` | Conversation mgmt | — |
+| `conversation_history_list` / `conversation_clear` | Conversation history | — |
+| `message_create` / `message_update` / `message_delete` / `message_list` | Message mgmt | — |
+| `ltm_write` / `ltm_read` | Long-term memory | — |
+
+**Condition edge ports**: `sourcePortID="true"` (IF), `sourcePortID="false"` (ELSE), `sourcePortID="true_1"` (ELIF)
+**Intent edge ports**: `sourcePortID="branch_0"`, `sourcePortID="branch_1"`, ..., `sourcePortID="default"`
 
 ## YAML Format (coze.cn Cloud)
 
@@ -428,6 +453,11 @@ build_workflow("my_workflow", "7585079438426600001", "描述", nodes, edges, "./
 | `inner_llm_node(id, title, sys_prompt, prompt, ref_id, ref_path, x, y)` | LLM inside Loop | 8-space indent version |
 | `loop_node(id, title, ref_id, ref_path, inner_str, edge_pairs, last_id, x, y)` | Loop container | `inner_str`: concatenated inner_llm_node outputs |
 | `merge_node(id, refs, x, y)` | Variable merge | `refs`: `[(node_id, "output"), ...]` |
+| `code_node(id, title, code, lang, inputs, outputs, ref_id, ref_path, x, y)` | Code (`code`) | `lang`: 3=Python, 5=TS |
+| `http_node(id, title, method, url, ref_id, ref_path, x, y)` | HTTP (`http`) | `method`: GET/POST/PUT/DELETE |
+| `selector_node(id, title, ref_id, ref_path, condition_value, x, y)` | Condition (`condition`) | Edges: `true`/`false` ports |
+| `intent_node(id, title, intents_list, ref_id, ref_path, x, y)` | Intent (`intent`) | Edges: `branch_0`/`branch_1`/... |
+| `knowledge_node(id, title, ref_id, ref_path, x, y)` | Knowledge (`knowledge`) | Returns `outputList` |
 | `edge(src, tgt, source_port=None)` | Edge connection | `source_port="loop-output"` for loop exit |
 | `build_workflow(name, wf_id, desc, nodes, edges, out_path)` | Assemble + ZIP | Produces importable zip |
 

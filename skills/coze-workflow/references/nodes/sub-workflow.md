@@ -1,13 +1,13 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `subworkflow` | Status: 未验证
+YAML type: `subflow` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.
 
 ```yaml
     - id: "200001"
-      type: subworkflow
+      type: subflow
       title: 子工作流
       position:
         x: 0

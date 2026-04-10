@@ -1,13 +1,13 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `text_processor` | Status: 未验证
+YAML type: `text` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.
 
 ```yaml
     - id: "200001"
-      type: text_processor
+      type: text
       title: 文本处理
       position:
         x: 0

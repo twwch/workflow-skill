@@ -1,13 +1,13 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `json_serialization` | Status: 未验证
+YAML type: `to_json` / `from_json` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.
 
 ```yaml
     - id: "200001"
-      type: json_serialization
+      type: to_json
       title: JSON序列化
       position:
         x: 0

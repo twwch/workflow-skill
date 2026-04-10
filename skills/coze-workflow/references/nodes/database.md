@@ -1,6 +1,6 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `database_query/insert/update/delete` | Status: 未验证
+YAML type: `database` / `select_record` / `insert_record` / `update_record` / `delete_record` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.

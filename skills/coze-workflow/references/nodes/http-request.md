@@ -1,13 +1,13 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `http_requester` | Status: 未验证
+YAML type: `http` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.
 
 ```yaml
     - id: "200001"
-      type: http_requester
+      type: http
       title: HTTP请求
       position:
         x: 0

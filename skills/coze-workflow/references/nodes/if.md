@@ -1,13 +1,13 @@
 ## coze.cn Cloud YAML Format
 
-YAML type: `selector` | Status: 未验证
+YAML type: `condition` | Status: 未验证
 
 > This node type's cloud YAML format is based on source code analysis.
 > For verified format, export a real workflow from coze.cn containing this node.
 
 ```yaml
     - id: "200001"
-      type: selector
+      type: condition
       title: 条件分支
       position:
         x: 0

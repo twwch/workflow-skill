@@ -248,11 +248,7 @@ def merge_node(nid, refs, x=0, y=0):
         y: {y}
       parameters:
         mergeGroups:
-{groups}        node_outputs:
-            output:
-                type: string
-                value: null
-'''
+{groups}'''
 
 
 def loop_node(nid, title, ref_id, ref_path, inner_nodes_str, inner_edge_pairs, last_inner_id, x=0, y=0):
@@ -314,6 +310,255 @@ def edge(src, tgt, source_port=None):
     if source_port:
         r += f'      source_port: {source_port}\n'
     return r
+
+
+ICON_CODE = 'https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-Code-v2.jpg'
+ICON_HTTP = 'https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-HTTP.png'
+ICON_IF = 'https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-condition.jpg'
+ICON_INTENT = 'https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-Intent-v2.jpg'
+ICON_KNOWLEDGE = 'https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-KnowledgeQuery-v2.jpg'
+
+
+def code_node(nid, title, code_str, language, inputs_list, outputs_list, ref_id, ref_path, x=0, y=0):
+    """Code 节点。language: 3=Python, 5=TypeScript"""
+    code_escaped = _esc(code_str)
+    inp_yaml = ''
+    for inp in inputs_list:
+        inp_yaml += f'''            - name: {inp["name"]}
+              input:
+                value:
+                    path: {ref_path}
+                    ref_node: "{ref_id}"
+'''
+    out_yaml = ''
+    for out in outputs_list:
+        out_yaml += f'''            {out["name"]}:
+                type: {out.get("type","string")}
+                value: null
+'''
+    return f'''    - id: "{nid}"
+      type: code
+      title: {title}
+      icon: {ICON_CODE}
+      description: "编写代码，处理输入变量来生成返回值"
+      version: v2
+      position:
+        x: {x}
+        y: {y}
+      parameters:
+        code: "{code_escaped}"
+        language: {language}
+        node_inputs:
+{inp_yaml}        node_outputs:
+{out_yaml}        settingOnError: {{}}
+'''
+
+
+def http_node(nid, title, method, url, ref_id="100001", ref_path="input", x=0, y=0):
+    """HTTP 请求节点"""
+    return f'''    - id: "{nid}"
+      type: http
+      title: {title}
+      icon: {ICON_HTTP}
+      description: "用于发送API请求，从接口返回数据"
+      position:
+        x: {x}
+        y: {y}
+      parameters:
+        apiInfo:
+            method: {method}
+            url: "{url}"
+        auth:
+            authData:
+                customData:
+                    addTo: header
+            authType: BEARER_AUTH
+        body:
+            bodyData:
+                binary:
+                    fileURL:
+                        type: string
+                        value:
+                            content:
+                                blockID: ""
+                                name: ""
+                                source: block-output
+                            type: ref
+            bodyType: EMPTY
+        node_outputs:
+            body:
+                type: string
+                value: null
+            headers:
+                type: string
+                value: null
+            statusCode:
+                type: integer
+                value: null
+        setting:
+            retryTimes: 3
+            timeout: 120
+        settingOnError: {{}}
+'''
+
+
+def selector_node(nid, title, ref_id, ref_path, condition_value, x=0, y=0):
+    """条件分支节点 (IF/ELSE)"""
+    return f'''    - id: "{nid}"
+      type: condition
+      title: {title}
+      icon: {ICON_IF}
+      description: "连接多个下游分支，若设定的条件成立则仅运行对应的分支，若均不成立则只运行\\"否则\\"分支"
+      position:
+        x: {x}
+        y: {y}
+      parameters:
+        branches:
+            - condition:
+                conditions:
+                    - {{}}
+                logic: 2
+'''
+
+
+def intent_node(nid, title, intents_list, ref_id, ref_path, x=0, y=0):
+    """意图识别节点"""
+    intents_yaml = ''
+    for intent in intents_list:
+        intents_yaml += f'''            - name: "{intent}"
+'''
+    return f'''    - id: "{nid}"
+      type: intent
+      title: {title}
+      icon: {ICON_INTENT}
+      description: "用于用户输入的意图识别，并将其与预设意图选项进行匹配。"
+      version: "2"
+      position:
+        x: {x}
+        y: {y}
+      parameters:
+        chatHistorySetting:
+            chatHistoryRound: 3
+            enableChatHistory: false
+        intents:
+{intents_yaml}        llmParam:
+            cachingExpireTime: 259200
+            chatHistoryRound: 3
+            enableChatHistory: false
+            frequencyPenalty: 0
+            generationDiversity: default_val
+            maxOutputTokens: 4096
+            maxTokens: 100
+            modelName: Kimi-K2-250905
+            modelType: 1763350148
+            parameters:
+                max_completion_tokens: 0
+                reasoning_effort: minimal
+            prompt:
+                type: string
+                value:
+                    content: "{{{{query}}}}"
+                    type: literal
+            responseFormat: 2
+            store: true
+            systemPrompt:
+                type: string
+                value:
+                    content: ""
+                    type: literal
+            temperature: 0.3
+            thinkingType: disabled
+            topP: 1
+        mode: top_speed
+        node_inputs:
+            - name: query
+              input:
+                value:
+                    path: {ref_path}
+                    ref_node: "{ref_id}"
+        node_outputs:
+            classificationId:
+                type: integer
+                value: null
+            reason:
+                type: string
+                value: null
+        settingOnError: {{}}
+'''
+
+
+def knowledge_node(nid, title, ref_id, ref_path, x=0, y=0):
+    """知识库检索节点"""
+    return f'''    - id: "{nid}"
+      type: knowledge
+      title: {title}
+      icon: {ICON_KNOWLEDGE}
+      description: "在选定的知识中,根据输入变量召回最匹配的信息,并以列表形式返回"
+      position:
+        x: {x}
+        y: {y}
+      parameters:
+        datasetParam:
+            - name: datasetList
+              input:
+                type: list
+                items:
+                    type: string
+                    value: null
+                value: []
+            - name: topK
+              input:
+                type: integer
+                value: "5"
+            - name: useRerank
+              input:
+                type: boolean
+                value: true
+            - name: useRewrite
+              input:
+                type: boolean
+                value: true
+            - name: isPersonalOnly
+              input:
+                type: boolean
+                value: true
+            - name: datasetType
+              input:
+                type: integer
+                value: "0"
+            - name: VolcanoInfoList
+              input:
+                type: list
+                items:
+                    type: object
+                    value: null
+                value: []
+        node_inputs:
+            - name: enableChatHistory
+              input:
+                type: boolean
+                value: false
+            - name: chatHistoryRound
+              input:
+                type: float
+                value: "3"
+            - name: query
+              input:
+                type: string
+                value:
+                    path: {ref_path}
+                    ref_node: "{ref_id}"
+        node_outputs:
+            outputList:
+                type: list
+                items:
+                    type: object
+                    properties:
+                        output:
+                            type: string
+                            value: null
+                value: null
+'''
 
 
 def build_workflow(name, wf_id, desc, nodes_str, edges_str, out_path):
