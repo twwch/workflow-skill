@@ -1,0 +1,1068 @@
+{
+  "id": "159d89f4-2432-4666-9f4a-c2b1128f64a1",
+  "revision": 0,
+  "last_node_id": 15,
+  "last_link_id": 14,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LLM_api_loader",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        400,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "model_name",
+          "localized_name": "model_name",
+          "name": "model_name",
+          "type": "STRING",
+          "widget": {
+            "name": "model_name"
+          },
+          "link": null
+        },
+        {
+          "label": "base_url",
+          "localized_name": "base_url",
+          "name": "base_url",
+          "type": "STRING",
+          "widget": {
+            "name": "base_url"
+          },
+          "link": null
+        },
+        {
+          "label": "api_key",
+          "localized_name": "api_key",
+          "name": "api_key",
+          "type": "STRING",
+          "widget": {
+            "name": "api_key"
+          },
+          "link": null
+        },
+        {
+          "label": "is_ollama",
+          "localized_name": "is_ollama",
+          "name": "is_ollama",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "is_ollama"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "CUSTOM",
+          "links": [
+            1
+          ],
+          "slot_index": 0,
+          "label": "model",
+          "localized_name": "model"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LLM_api_loader"
+      },
+      "title": "LLM Loader",
+      "widgets_values": [
+        "gpt-4o-mini",
+        "https://api.openai.com/v1",
+        "",
+        false
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LLM",
+      "pos": [
+        0,
+        200
+      ],
+      "size": [
+        450,
+        400
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "system_prompt",
+          "localized_name": "system_prompt",
+          "name": "system_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "system_prompt"
+          },
+          "link": null
+        },
+        {
+          "label": "user_prompt",
+          "localized_name": "user_prompt",
+          "name": "user_prompt",
+          "type": "STRING",
+          "widget": {
+            "name": "user_prompt"
+          },
+          "link": null
+        },
+        {
+          "name": "model",
+          "type": "CUSTOM",
+          "link": 1,
+          "label": "model",
+          "localized_name": "model"
+        },
+        {
+          "label": "temperature",
+          "localized_name": "temperature",
+          "name": "temperature",
+          "type": "FLOAT",
+          "widget": {
+            "name": "temperature"
+          },
+          "link": null
+        },
+        {
+          "label": "is_memory",
+          "localized_name": "is_memory",
+          "name": "is_memory",
+          "type": "COMBO",
+          "widget": {
+            "name": "is_memory"
+          },
+          "link": null
+        },
+        {
+          "label": "is_tools_in_sys_prompt",
+          "localized_name": "is_tools_in_sys_prompt",
+          "name": "is_tools_in_sys_prompt",
+          "type": "COMBO",
+          "widget": {
+            "name": "is_tools_in_sys_prompt"
+          },
+          "link": null
+        },
+        {
+          "label": "is_locked",
+          "localized_name": "is_locked",
+          "name": "is_locked",
+          "type": "COMBO",
+          "widget": {
+            "name": "is_locked"
+          },
+          "link": null
+        },
+        {
+          "label": "main_brain",
+          "localized_name": "main_brain",
+          "name": "main_brain",
+          "type": "COMBO",
+          "widget": {
+            "name": "main_brain"
+          },
+          "link": null
+        },
+        {
+          "label": "max_length",
+          "localized_name": "max_length",
+          "name": "max_length",
+          "type": "INT",
+          "widget": {
+            "name": "max_length"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "assistant_response",
+          "type": "STRING",
+          "links": [
+            2
+          ],
+          "slot_index": 0,
+          "label": "assistant_response",
+          "localized_name": "assistant_response"
+        },
+        {
+          "name": "history",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 1,
+          "label": "history",
+          "localized_name": "history"
+        },
+        {
+          "name": "tool",
+          "type": "STRING",
+          "links": [],
+          "slot_index": 2,
+          "label": "tool",
+          "localized_name": "tool"
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 3,
+          "label": "image",
+          "localized_name": "image"
+        },
+        {
+          "name": "reasoning_content",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 4,
+          "label": "reasoning_content",
+          "localized_name": "reasoning_content"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LLM"
+      },
+      "title": "Prompt Enhancer",
+      "widgets_values": [
+        "You are an expert prompt engineer for FLUX image generation. Given a simple description, output ONLY an enhanced detailed prompt in English. Include: subject details, lighting, composition, style, quality tags. Output the prompt only, no explanation.",
+        "a cat sitting on a windowsill",
+        0.7,
+        "disable",
+        "disable",
+        "disable",
+        "enable",
+        1920,
+        "",
+        100,
+        "",
+        true,
+        false
+      ]
+    },
+    {
+      "id": 3,
+      "type": "UNETLoader",
+      "pos": [
+        500,
+        0
+      ],
+      "size": [
+        350,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "unet_name",
+          "localized_name": "unet_name",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "label": "weight_dtype",
+          "localized_name": "weight_dtype",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            4,
+            5
+          ],
+          "slot_index": 0,
+          "label": "MODEL",
+          "localized_name": "MODEL"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "title": "FLUX Model",
+      "widgets_values": [
+        "flux1-dev.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "DualCLIPLoader",
+      "pos": [
+        500,
+        130
+      ],
+      "size": [
+        315,
+        120
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "clip_name1",
+          "localized_name": "clip_name1",
+          "name": "clip_name1",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name1"
+          },
+          "link": null
+        },
+        {
+          "label": "clip_name2",
+          "localized_name": "clip_name2",
+          "name": "clip_name2",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name2"
+          },
+          "link": null
+        },
+        {
+          "label": "type",
+          "localized_name": "type",
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3
+          ],
+          "slot_index": 0,
+          "label": "CLIP",
+          "localized_name": "CLIP"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DualCLIPLoader"
+      },
+      "title": "FLUX CLIP",
+      "widgets_values": [
+        "clip_l.safetensors",
+        "t5xxl_fp16.safetensors",
+        "flux"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode_party",
+      "pos": [
+        500,
+        300
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3,
+          "label": "clip",
+          "localized_name": "clip"
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 2,
+          "label": "text",
+          "localized_name": "text",
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            6
+          ],
+          "slot_index": 0,
+          "label": "CONDITIONING",
+          "localized_name": "CONDITIONING"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode_party"
+      },
+      "title": "Positive (from LLM)"
+    },
+    {
+      "id": 7,
+      "type": "EmptyLatentImage",
+      "pos": [
+        850,
+        400
+      ],
+      "size": [
+        225,
+        106
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "width",
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "label": "height",
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "label": "batch_size",
+          "localized_name": "batch_size",
+          "name": "batch_size",
+          "type": "INT",
+          "widget": {
+            "name": "batch_size"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            11
+          ],
+          "slot_index": 0,
+          "label": "LATENT",
+          "localized_name": "LATENT"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1
+      ]
+    },
+    {
+      "id": 8,
+      "type": "BasicGuider",
+      "pos": [
+        850,
+        0
+      ],
+      "size": [
+        225,
+        72
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 4,
+          "label": "model",
+          "localized_name": "model"
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 6,
+          "label": "conditioning",
+          "localized_name": "conditioning"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            7
+          ],
+          "slot_index": 0,
+          "label": "GUIDER",
+          "localized_name": "GUIDER"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicGuider"
+      }
+    },
+    {
+      "id": 9,
+      "type": "BasicScheduler",
+      "pos": [
+        850,
+        120
+      ],
+      "size": [
+        225,
+        106
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5,
+          "label": "model",
+          "localized_name": "model"
+        },
+        {
+          "label": "scheduler",
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "label": "steps",
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "label": "denoise",
+          "localized_name": "denoise",
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            9
+          ],
+          "slot_index": 0,
+          "label": "SIGMAS",
+          "localized_name": "SIGMAS"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicScheduler"
+      },
+      "widgets_values": [
+        "simple",
+        20,
+        1.0
+      ]
+    },
+    {
+      "id": 10,
+      "type": "KSamplerSelect",
+      "pos": [
+        850,
+        275
+      ],
+      "size": [
+        225,
+        58
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "sampler_name",
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            8
+          ],
+          "slot_index": 0,
+          "label": "SAMPLER",
+          "localized_name": "SAMPLER"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 11,
+      "type": "RandomNoise",
+      "pos": [
+        850,
+        340
+      ],
+      "size": [
+        225,
+        82
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "noise_seed",
+          "localized_name": "noise_seed",
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        },
+        {
+          "label": "control_after_generate",
+          "localized_name": "control_after_generate",
+          "name": "control_after_generate",
+          "type": "COMBO",
+          "widget": {
+            "name": "control_after_generate"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            10
+          ],
+          "slot_index": 0,
+          "label": "NOISE",
+          "localized_name": "NOISE"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        0,
+        "randomize"
+      ]
+    },
+    {
+      "id": 12,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        1150,
+        0
+      ],
+      "size": [
+        280,
+        160
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 10,
+          "label": "noise",
+          "localized_name": "noise"
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 7,
+          "label": "guider",
+          "localized_name": "guider"
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 8,
+          "label": "sampler",
+          "localized_name": "sampler"
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 9,
+          "label": "sigmas",
+          "localized_name": "sigmas"
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 11,
+          "label": "latent_image",
+          "localized_name": "latent_image"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            12
+          ],
+          "slot_index": 0,
+          "label": "output",
+          "localized_name": "output"
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null,
+          "slot_index": 1,
+          "label": "denoised_output",
+          "localized_name": "denoised_output"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      }
+    },
+    {
+      "id": 14,
+      "type": "VAELoader",
+      "pos": [
+        1150,
+        200
+      ],
+      "size": [
+        290,
+        82
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "vae_name",
+          "localized_name": "vae_name",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            13
+          ],
+          "slot_index": 0,
+          "label": "VAE",
+          "localized_name": "VAE"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "title": "FLUX VAE",
+      "widgets_values": [
+        "ae.safetensors"
+      ]
+    },
+    {
+      "id": 13,
+      "type": "VAEDecode",
+      "pos": [
+        1500,
+        0
+      ],
+      "size": [
+        265,
+        72
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 12,
+          "label": "samples",
+          "localized_name": "samples"
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 13,
+          "label": "vae",
+          "localized_name": "vae"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            14
+          ],
+          "slot_index": 0,
+          "label": "IMAGE",
+          "localized_name": "IMAGE"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [
+        1500,
+        120
+      ],
+      "size": [
+        320,
+        270
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 14,
+          "label": "images",
+          "localized_name": "images"
+        },
+        {
+          "label": "filename_prefix",
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "title": "Save Image",
+      "widgets_values": [
+        "ComfyUI_LLM_Enhanced"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      2,
+      "CUSTOM"
+    ],
+    [
+      2,
+      2,
+      0,
+      5,
+      1,
+      "STRING"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      3,
+      0,
+      8,
+      0,
+      "MODEL"
+    ],
+    [
+      5,
+      3,
+      0,
+      9,
+      0,
+      "MODEL"
+    ],
+    [
+      6,
+      5,
+      0,
+      8,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      7,
+      8,
+      0,
+      12,
+      1,
+      "GUIDER"
+    ],
+    [
+      8,
+      10,
+      0,
+      12,
+      2,
+      "SAMPLER"
+    ],
+    [
+      9,
+      9,
+      0,
+      12,
+      3,
+      "SIGMAS"
+    ],
+    [
+      10,
+      11,
+      0,
+      12,
+      0,
+      "NOISE"
+    ],
+    [
+      11,
+      7,
+      0,
+      12,
+      4,
+      "LATENT"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "LATENT"
+    ],
+    [
+      13,
+      14,
+      0,
+      13,
+      1,
+      "VAE"
+    ],
+    [
+      14,
+      13,
+      0,
+      15,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "LLM Prompt Enhancement",
+      "bounding": [
+        -30,
+        -50,
+        500,
+        620
+      ],
+      "color": "#2A2",
+      "font_size": 24
+    },
+    {
+      "title": "FLUX Image Generation",
+      "bounding": [
+        470,
+        -50,
+        1100,
+        530
+      ],
+      "color": "#28A",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

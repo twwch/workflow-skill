@@ -1,0 +1,804 @@
+{
+  "id": "6777dcf8-8143-4491-a6f5-071ec1ee3795",
+  "revision": 0,
+  "last_node_id": 11,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "UNETLoader",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        350,
+        82
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "unet_name",
+          "localized_name": "unet_name",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "label": "weight_dtype",
+          "localized_name": "weight_dtype",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            6
+          ],
+          "slot_index": 0,
+          "label": "MODEL",
+          "localized_name": "MODEL"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "title": "Load Hunyuan3D Model",
+      "widgets_values": [
+        "hunyuan3d_v2_turbo.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "CLIPVisionLoader",
+      "pos": [
+        0,
+        130
+      ],
+      "size": [
+        290,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "clip_name",
+          "localized_name": "clip_name",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP_VISION",
+          "type": "CLIP_VISION",
+          "links": [
+            1
+          ],
+          "slot_index": 0,
+          "label": "CLIP_VISION",
+          "localized_name": "CLIP_VISION"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPVisionLoader"
+      },
+      "title": "Load CLIP Vision",
+      "widgets_values": [
+        "clip_vision_h.safetensors"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [
+        0,
+        260
+      ],
+      "size": [
+        280,
+        310
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "image",
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "label": "upload",
+          "localized_name": "upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            2
+          ],
+          "slot_index": 0,
+          "label": "IMAGE",
+          "localized_name": "IMAGE"
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1,
+          "label": "MASK",
+          "localized_name": "MASK"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "title": "Load Input Image",
+      "widgets_values": [
+        "input.png"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "CLIPVisionEncode",
+      "pos": [
+        380,
+        130
+      ],
+      "size": [
+        250,
+        100
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_vision",
+          "type": "CLIP_VISION",
+          "link": 1,
+          "label": "clip_vision",
+          "localized_name": "clip_vision"
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2,
+          "label": "image",
+          "localized_name": "image"
+        },
+        {
+          "label": "crop",
+          "localized_name": "crop",
+          "name": "crop",
+          "type": "COMBO",
+          "widget": {
+            "name": "crop"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CLIP_VISION_OUTPUT",
+          "type": "CLIP_VISION_OUTPUT",
+          "links": [
+            3
+          ],
+          "slot_index": 0,
+          "label": "CLIP_VISION_OUTPUT",
+          "localized_name": "CLIP_VISION_OUTPUT"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPVisionEncode"
+      },
+      "title": "Encode Vision",
+      "widgets_values": [
+        "center"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "Hunyuan3Dv2Conditioning",
+      "pos": [
+        380,
+        280
+      ],
+      "size": [
+        280,
+        80
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip_vision_output",
+          "type": "CLIP_VISION_OUTPUT",
+          "link": 3,
+          "label": "clip_vision_output",
+          "localized_name": "clip_vision_output"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ],
+          "slot_index": 0,
+          "label": "positive",
+          "localized_name": "positive"
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ],
+          "slot_index": 1,
+          "label": "negative",
+          "localized_name": "negative"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Hunyuan3Dv2Conditioning"
+      },
+      "title": "Hunyuan3D Conditioning"
+    },
+    {
+      "id": 6,
+      "type": "EmptyLatentHunyuan3Dv2",
+      "pos": [
+        380,
+        410
+      ],
+      "size": [
+        225,
+        82
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "resolution",
+          "localized_name": "resolution",
+          "name": "resolution",
+          "type": "INT",
+          "widget": {
+            "name": "resolution"
+          },
+          "link": null
+        },
+        {
+          "label": "batch_size",
+          "localized_name": "batch_size",
+          "name": "batch_size",
+          "type": "INT",
+          "widget": {
+            "name": "batch_size"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            7
+          ],
+          "slot_index": 0,
+          "label": "LATENT",
+          "localized_name": "LATENT"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentHunyuan3Dv2"
+      },
+      "title": "Empty 3D Latent",
+      "widgets_values": [
+        3072,
+        1
+      ]
+    },
+    {
+      "id": 7,
+      "type": "KSampler",
+      "pos": [
+        750,
+        0
+      ],
+      "size": [
+        300,
+        340
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 6,
+          "label": "model",
+          "localized_name": "model"
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 4,
+          "label": "positive",
+          "localized_name": "positive"
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 5,
+          "label": "negative",
+          "localized_name": "negative"
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 7,
+          "label": "latent_image",
+          "localized_name": "latent_image"
+        },
+        {
+          "label": "seed",
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "label": "control_after_generate",
+          "localized_name": "control_after_generate",
+          "name": "control_after_generate",
+          "type": "COMBO",
+          "widget": {
+            "name": "control_after_generate"
+          },
+          "link": null
+        },
+        {
+          "label": "steps",
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "label": "cfg",
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "label": "sampler_name",
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "label": "scheduler",
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "label": "denoise",
+          "localized_name": "denoise",
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            8
+          ],
+          "slot_index": 0,
+          "label": "LATENT",
+          "localized_name": "LATENT"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        0,
+        "randomize",
+        30,
+        7,
+        "euler",
+        "normal",
+        1
+      ]
+    },
+    {
+      "id": 9,
+      "type": "VAELoader",
+      "pos": [
+        750,
+        390
+      ],
+      "size": [
+        290,
+        82
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "label": "vae_name",
+          "localized_name": "vae_name",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            9
+          ],
+          "slot_index": 0,
+          "label": "VAE",
+          "localized_name": "VAE"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "title": "Load 3D VAE",
+      "widgets_values": [
+        "hunyuan3d_v2_vae.safetensors"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "VAEDecodeHunyuan3D",
+      "pos": [
+        1100,
+        0
+      ],
+      "size": [
+        300,
+        106
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 8,
+          "label": "samples",
+          "localized_name": "samples"
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 9,
+          "label": "vae",
+          "localized_name": "vae"
+        },
+        {
+          "label": "num_chunks",
+          "localized_name": "num_chunks",
+          "name": "num_chunks",
+          "type": "INT",
+          "widget": {
+            "name": "num_chunks"
+          },
+          "link": null
+        },
+        {
+          "label": "octree_resolution",
+          "localized_name": "octree_resolution",
+          "name": "octree_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "octree_resolution"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VOXEL",
+          "type": "VOXEL",
+          "links": [
+            10
+          ],
+          "slot_index": 0,
+          "label": "VOXEL",
+          "localized_name": "VOXEL"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecodeHunyuan3D"
+      },
+      "title": "Decode to Voxel",
+      "widgets_values": [
+        8000,
+        256
+      ]
+    },
+    {
+      "id": 10,
+      "type": "VoxelToMeshBasic",
+      "pos": [
+        1100,
+        160
+      ],
+      "size": [
+        265,
+        82
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "voxel",
+          "type": "VOXEL",
+          "link": 10,
+          "label": "voxel",
+          "localized_name": "voxel"
+        },
+        {
+          "label": "threshold",
+          "localized_name": "threshold",
+          "name": "threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "threshold"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MESH",
+          "type": "MESH",
+          "links": [
+            11
+          ],
+          "slot_index": 0,
+          "label": "MESH",
+          "localized_name": "MESH"
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VoxelToMeshBasic"
+      },
+      "title": "Voxel to Mesh",
+      "widgets_values": [
+        0.6
+      ]
+    },
+    {
+      "id": 11,
+      "type": "SaveGLB",
+      "pos": [
+        1100,
+        300
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mesh",
+          "type": "MESH",
+          "link": 11,
+          "label": "mesh",
+          "localized_name": "mesh"
+        },
+        {
+          "label": "filename_prefix",
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveGLB"
+      },
+      "title": "Save 3D Model",
+      "widgets_values": [
+        "mesh/ComfyUI_3D"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      4,
+      0,
+      "CLIP_VISION"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      1,
+      "IMAGE"
+    ],
+    [
+      3,
+      4,
+      0,
+      5,
+      0,
+      "CLIP_VISION_OUTPUT"
+    ],
+    [
+      4,
+      5,
+      0,
+      7,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      5,
+      1,
+      7,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      1,
+      0,
+      7,
+      0,
+      "MODEL"
+    ],
+    [
+      7,
+      6,
+      0,
+      7,
+      3,
+      "LATENT"
+    ],
+    [
+      8,
+      7,
+      0,
+      8,
+      0,
+      "LATENT"
+    ],
+    [
+      9,
+      9,
+      0,
+      8,
+      1,
+      "VAE"
+    ],
+    [
+      10,
+      8,
+      0,
+      10,
+      0,
+      "VOXEL"
+    ],
+    [
+      11,
+      10,
+      0,
+      11,
+      0,
+      "MESH"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4,
+  "models": [
+    {
+      "name": "hunyuan3d_v2_turbo.safetensors",
+      "url": "https://huggingface.co/Tencent/Hunyuan3D-2/resolve/main/hunyuan3d_v2_turbo.safetensors",
+      "directory": "diffusion_models"
+    },
+    {
+      "name": "clip_vision_h.safetensors",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors",
+      "directory": "clip_vision"
+    },
+    {
+      "name": "hunyuan3d_v2_vae.safetensors",
+      "url": "https://huggingface.co/Tencent/Hunyuan3D-2/resolve/main/hunyuan3d_v2_vae.safetensors",
+      "directory": "vae"
+    }
+  ]
+}

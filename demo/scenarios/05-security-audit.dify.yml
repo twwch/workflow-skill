@@ -1,0 +1,579 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "代码仓库安全审计 Agent"
+  mode: workflow
+  icon: "\U0001F512"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "GitHub repo → 遍历文件 → 按语言 4 路扫描 → P0/P1/P2 分流 → 历史趋势对比 → Confluence 报告"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload: { enabled: false }
+    opening_statement: ""
+    retriever_resource: { enabled: false }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+  graph:
+    nodes:
+      - id: "1734400001001"
+        type: custom
+        position: { x: 80, y: 482 }
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            - { variable: repo_url, label: GitHub Repo URL, type: url, required: true }
+
+      - id: "1734400002001"
+        type: custom
+        position: { x: 380, y: 482 }
+        data:
+          type: http-request
+          title: GitHub 文件树
+          desc: ""
+          method: get
+          url: "https://api.github.com/repos/{{#1734400001001.repo_url#}}/git/trees/main?recursive=1"
+          headers: "Accept:application/vnd.github+json"
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: api-key, config: { type: bearer, api_key: "GH_TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734400003001"
+        type: custom
+        position: { x: 680, y: 482 }
+        data:
+          type: code
+          title: 过滤源码文件
+          desc: ""
+          code_language: python3
+          code: |
+            import json
+            def main(raw: str) -> dict:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                tree = data.get("tree", []) if isinstance(data, dict) else []
+                exts = (".py", ".js", ".ts", ".go", ".java")
+                files = [t for t in tree if t.get("type") == "blob" and t.get("path", "").endswith(exts)]
+                return {"files": files}
+          variables:
+            - { variable: raw, value_selector: ["1734400002001", "body"] }
+          outputs:
+            files: { type: "array[object]", children: null }
+
+      # ===== Iteration: 遍历文件扫描 =====
+      - id: "1734400004001"
+        type: custom
+        position: { x: 980, y: 482 }
+        data:
+          type: iteration
+          title: "Iter: 扫描每个文件"
+          desc: ""
+          start_node_id: "1734400004001start"
+          iterator_selector: ["1734400003001", "files"]
+          iterator_input_type: "array[object]"
+          output_selector: ["1734400004009", "result"]
+          output_type: "array[object]"
+          is_parallel: true
+          parallel_nums: 5
+          error_handle_mode: remove-abnormal-output
+          flatten_output: false
+          width: 1800
+          height: 500
+        width: 1800
+        height: 500
+        zIndex: 1
+
+      - id: "1734400004001start"
+        type: custom-iteration-start
+        parentId: "1734400004001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734400004002"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: http-request
+          title: 拉文件内容
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          method: get
+          url: "https://raw.githubusercontent.com/{{#1734400001001.repo_url#}}/main/{{#1734400004001.item.path#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734400004003"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 340, y: 68 }
+        zIndex: 1002
+        data:
+          type: if-else
+          title: 语言路由
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: string, comparison_operator: "end with", value: ".py", variable_selector: ["1734400004001", "item", "path"] }
+            - case_id: "case_js"
+              id: "case_js"
+              logical_operator: and
+              conditions:
+                - { id: c2, varType: string, comparison_operator: "end with", value: ".js", variable_selector: ["1734400004001", "item", "path"] }
+            - case_id: "case_go"
+              id: "case_go"
+              logical_operator: and
+              conditions:
+                - { id: c3, varType: string, comparison_operator: "end with", value: ".go", variable_selector: ["1734400004001", "item", "path"] }
+
+      - id: "1734400004004"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 580, y: 0 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: Python 扫描
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "Python 安全审计专家，查 CWE" }, { role: user, text: "{{#1734400004002.body#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400004005"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 580, y: 100 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: JS 扫描
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "JS 安全审计专家" }, { role: user, text: "{{#1734400004002.body#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400004006"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 580, y: 200 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: Go 扫描
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "Go 安全审计专家" }, { role: user, text: "{{#1734400004002.body#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400004007"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 580, y: 300 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: Java 扫描
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "Java 安全审计专家" }, { role: user, text: "{{#1734400004002.body#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400004008"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 900, y: 150 }
+        zIndex: 1002
+        data:
+          type: variable-aggregator
+          title: 合流扫描结果
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          output_type: string
+          variables:
+            - ["1734400004004", "text"]
+            - ["1734400004005", "text"]
+            - ["1734400004006", "text"]
+            - ["1734400004007", "text"]
+
+      - id: "1734400004009"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 1140, y: 68 }
+        zIndex: 1002
+        data:
+          type: parameter-extractor
+          title: 抽漏洞
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          query: ["1734400004008", "output"]
+          reasoning_mode: function_call
+          parameters:
+            - { name: cwe, type: string, required: false, description: "CWE 编号" }
+            - { name: severity, type: string, required: false, description: "P0/P1/P2" }
+            - { name: location, type: string, required: false, description: "位置" }
+
+      - id: "1734400004010"
+        type: custom
+        parentId: "1734400004001"
+        position: { x: 1380, y: 68 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 打分结果
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734400004001"
+          code_language: python3
+          code: |
+            def main(file_path, cwe, severity, location) -> dict:
+                return {"result": {"file": file_path, "cwe": cwe, "severity": severity or "P2", "location": location}}
+          variables:
+            - { variable: file_path, value_selector: ["1734400004001", "item", "path"] }
+            - { variable: cwe, value_selector: ["1734400004009", "cwe"] }
+            - { variable: severity, value_selector: ["1734400004009", "severity"] }
+            - { variable: location, value_selector: ["1734400004009", "location"] }
+          outputs:
+            result: { type: object, children: null }
+
+      # ===== 出 Iter, 分严重度 =====
+      - id: "1734400005001"
+        type: custom
+        position: { x: 2880, y: 482 }
+        data:
+          type: code
+          title: 按严重度分组
+          desc: ""
+          code_language: python3
+          code: |
+            def main(vulns) -> dict:
+                p0, p1, p2 = [], [], []
+                for v in (vulns or []):
+                    s = (v or {}).get("severity", "P2")
+                    if s == "P0": p0.append(v)
+                    elif s == "P1": p1.append(v)
+                    else: p2.append(v)
+                return {"p0": p0, "p1": p1, "p2": p2, "has_p0": len(p0) > 0, "has_p1": len(p1) > 0}
+          variables:
+            - { variable: vulns, value_selector: ["1734400004001", "output"] }
+          outputs:
+            p0: { type: "array[object]", children: null }
+            p1: { type: "array[object]", children: null }
+            p2: { type: "array[object]", children: null }
+            has_p0: { type: boolean, children: null }
+            has_p1: { type: boolean, children: null }
+
+      - id: "1734400006001"
+        type: custom
+        position: { x: 3180, y: 282 }
+        data:
+          type: if-else
+          title: 有 P0?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: boolean, comparison_operator: "is", value: "true", variable_selector: ["1734400005001", "has_p0"] }
+
+      - id: "1734400007001"
+        type: custom
+        position: { x: 3480, y: 200 }
+        data:
+          type: llm
+          title: 生成 PR 描述
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template: [{ role: system, text: "为 P0 漏洞生成修复 PR 描述" }, { role: user, text: "{{#1734400005001.p0#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400007002"
+        type: custom
+        position: { x: 3780, y: 120 }
+        data:
+          type: http-request
+          title: 创建 PR
+          desc: ""
+          method: post
+          url: "https://api.github.com/repos/{{#1734400001001.repo_url#}}/pulls"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734400007001.text#}}" }] }
+          authorization: { type: api-key, config: { type: bearer, api_key: "GH_TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734400007003"
+        type: custom
+        position: { x: 3780, y: 280 }
+        data:
+          type: http-request
+          title: PagerDuty 告警
+          desc: ""
+          method: post
+          url: "https://events.pagerduty.com/v2/enqueue"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "P0 vulnerability" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734400007004"
+        type: custom
+        position: { x: 4080, y: 200 }
+        data:
+          type: variable-aggregator
+          title: P0 合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734400007002", "body"]
+            - ["1734400007003", "body"]
+
+      # P1 路径
+      - id: "1734400008001"
+        type: custom
+        position: { x: 3180, y: 482 }
+        data:
+          type: if-else
+          title: 有 P1?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: boolean, comparison_operator: "is", value: "true", variable_selector: ["1734400005001", "has_p1"] }
+
+      - id: "1734400008002"
+        type: custom
+        position: { x: 3480, y: 482 }
+        data:
+          type: template-transform
+          title: issue 正文
+          desc: ""
+          template: "## P1 Vulnerabilities\n\n{{ p1 }}"
+          variables:
+            - { variable: p1, value_selector: ["1734400005001", "p1"] }
+
+      - id: "1734400008003"
+        type: custom
+        position: { x: 3780, y: 482 }
+        data:
+          type: http-request
+          title: 创建 issue
+          desc: ""
+          method: post
+          url: "https://api.github.com/repos/{{#1734400001001.repo_url#}}/issues"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734400008002.output#}}" }] }
+          authorization: { type: api-key, config: { type: bearer, api_key: "GH_TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      # P2 路径
+      - id: "1734400009001"
+        type: custom
+        position: { x: 3480, y: 682 }
+        data:
+          type: code
+          title: P2 入周报队列
+          desc: ""
+          code_language: python3
+          code: |
+            def main(p2) -> dict:
+                return {"queued": len(p2 or [])}
+          variables:
+            - { variable: p2, value_selector: ["1734400005001", "p2"] }
+          outputs:
+            queued: { type: number, children: null }
+
+      - id: "1734400010001"
+        type: custom
+        position: { x: 4380, y: 482 }
+        data:
+          type: variable-aggregator
+          title: 三路合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734400007004", "output"]
+            - ["1734400008003", "body"]
+            - ["1734400009001", "queued"]
+
+      - id: "1734400011001"
+        type: custom
+        position: { x: 4680, y: 482 }
+        data:
+          type: llm
+          title: 执行摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template:
+            - { role: system, text: "生成执行摘要" }
+            - { role: user, text: "P0: {{#1734400005001.p0#}}\nP1: {{#1734400005001.p1#}}\nP2: {{#1734400005001.p2#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400012001"
+        type: custom
+        position: { x: 4980, y: 482 }
+        data:
+          type: knowledge-retrieval
+          title: 历史同类问题
+          desc: ""
+          query_variable_selector: ["1734400011001", "text"]
+          dataset_ids: []
+          retrieval_mode: multiple
+          multiple_retrieval_config: { top_k: 5, reranking_enable: false }
+
+      - id: "1734400013001"
+        type: custom
+        position: { x: 5280, y: 482 }
+        data:
+          type: llm
+          title: 对比趋势
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template:
+            - { role: system, text: "对比历史，输出新增/修复/遗留" }
+            - { role: user, text: "本次: {{#1734400011001.text#}}\n历史: {{#1734400012001.result#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734400014001"
+        type: custom
+        position: { x: 5580, y: 482 }
+        data:
+          type: template-transform
+          title: Markdown 报告
+          desc: ""
+          template: |
+            # Security Audit Report
+
+            ## Summary
+            {{ summary }}
+
+            ## Trend
+            {{ trend }}
+          variables:
+            - { variable: summary, value_selector: ["1734400011001", "text"] }
+            - { variable: trend, value_selector: ["1734400013001", "text"] }
+
+      - id: "1734400015001"
+        type: custom
+        position: { x: 5880, y: 482 }
+        data:
+          type: http-request
+          title: 上传 Confluence
+          desc: ""
+          method: post
+          url: "https://api.atlassian.com/confluence/pages"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734400014001.output#}}" }] }
+          authorization: { type: api-key, config: { type: bearer, api_key: "CONF_TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734400016001"
+        type: custom
+        position: { x: 6180, y: 482 }
+        data:
+          type: end
+          title: End
+          desc: ""
+          outputs:
+            - { variable: report, value_selector: ["1734400014001", "output"], value_type: string }
+            - { variable: confluence, value_selector: ["1734400015001", "body"], value_type: string }
+            - { variable: p0_count, value_selector: ["1734400005001", "p0"], value_type: "array[object]" }
+
+    edges:
+      - { id: "e1", source: "1734400001001", sourceHandle: source, target: "1734400002001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e2", source: "1734400002001", sourceHandle: source, target: "1734400003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: code } }
+      - { id: "e3", source: "1734400003001", sourceHandle: source, target: "1734400004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e4", source: "1734400004001start", sourceHandle: source, target: "1734400004002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: iteration-start, targetType: http-request } }
+      - { id: "e5", source: "1734400004002", sourceHandle: source, target: "1734400004003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: http-request, targetType: if-else } }
+      - { id: "e6", source: "1734400004003", sourceHandle: "true", target: "1734400004004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: if-else, targetType: llm } }
+      - { id: "e7", source: "1734400004003", sourceHandle: "case_js", target: "1734400004005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: if-else, targetType: llm } }
+      - { id: "e8", source: "1734400004003", sourceHandle: "case_go", target: "1734400004006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: if-else, targetType: llm } }
+      - { id: "e9", source: "1734400004003", sourceHandle: "false", target: "1734400004007", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: if-else, targetType: llm } }
+      - { id: "e10", source: "1734400004004", sourceHandle: source, target: "1734400004008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e11", source: "1734400004005", sourceHandle: source, target: "1734400004008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e12", source: "1734400004006", sourceHandle: source, target: "1734400004008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e13", source: "1734400004007", sourceHandle: source, target: "1734400004008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e14", source: "1734400004008", sourceHandle: source, target: "1734400004009", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: variable-aggregator, targetType: parameter-extractor } }
+      - { id: "e15", source: "1734400004009", sourceHandle: source, target: "1734400004010", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734400004001", sourceType: parameter-extractor, targetType: code } }
+      - { id: "e16", source: "1734400004001", sourceHandle: source, target: "1734400005001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: code } }
+      - { id: "e17", source: "1734400005001", sourceHandle: source, target: "1734400006001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: if-else } }
+      - { id: "e18", source: "1734400005001", sourceHandle: source, target: "1734400008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: if-else } }
+      - { id: "e19", source: "1734400005001", sourceHandle: source, target: "1734400009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: code } }
+      - { id: "e20", source: "1734400006001", sourceHandle: "true", target: "1734400007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: llm } }
+      - { id: "e21", source: "1734400007001", sourceHandle: source, target: "1734400007002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: http-request } }
+      - { id: "e22", source: "1734400007001", sourceHandle: source, target: "1734400007003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: http-request } }
+      - { id: "e23", source: "1734400007002", sourceHandle: source, target: "1734400007004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e24", source: "1734400007003", sourceHandle: source, target: "1734400007004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e25", source: "1734400008001", sourceHandle: "true", target: "1734400008002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: template-transform } }
+      - { id: "e26", source: "1734400008002", sourceHandle: source, target: "1734400008003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: http-request } }
+      - { id: "e27", source: "1734400007004", sourceHandle: source, target: "1734400010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: variable-aggregator } }
+      - { id: "e28", source: "1734400008003", sourceHandle: source, target: "1734400010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e29", source: "1734400009001", sourceHandle: source, target: "1734400010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: variable-aggregator } }
+      - { id: "e30", source: "1734400010001", sourceHandle: source, target: "1734400011001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: llm } }
+      - { id: "e31", source: "1734400011001", sourceHandle: source, target: "1734400012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: knowledge-retrieval } }
+      - { id: "e32", source: "1734400012001", sourceHandle: source, target: "1734400013001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: knowledge-retrieval, targetType: llm } }
+      - { id: "e33", source: "1734400013001", sourceHandle: source, target: "1734400014001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: template-transform } }
+      - { id: "e34", source: "1734400014001", sourceHandle: source, target: "1734400015001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: http-request } }
+      - { id: "e35", source: "1734400015001", sourceHandle: source, target: "1734400016001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: end } }
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.4

@@ -1,0 +1,648 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "企业级客服工单全自动闭环"
+  mode: advanced-chat
+  icon: "\U0001F4AC"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "Chatflow：用户画像+订单→意图抽取→双层分类→多路 if/else 嵌套→知识库融合→埋点"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload: { enabled: false }
+    opening_statement: "您好，有什么可以帮您？"
+    retriever_resource: { enabled: true }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+  graph:
+    nodes:
+      - id: "1734200001001"
+        type: custom
+        position: { x: 80, y: 582 }
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            - { variable: user_tier, label: 用户等级, type: text-input, required: false, max_length: 20 }
+
+      - id: "1734200002001"
+        type: custom
+        position: { x: 380, y: 482 }
+        data:
+          type: http-request
+          title: 拉用户画像
+          desc: ""
+          method: get
+          url: "https://api.crm.com/user/{{#sys.user_id#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200002002"
+        type: custom
+        position: { x: 380, y: 682 }
+        data:
+          type: http-request
+          title: 拉订单历史
+          desc: ""
+          method: get
+          url: "https://api.order.com/history?uid={{#sys.user_id#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200003001"
+        type: custom
+        position: { x: 680, y: 582 }
+        data:
+          type: parameter-extractor
+          title: 抽取意图情绪订单
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          query: ["sys", "query"]
+          reasoning_mode: function_call
+          parameters:
+            - { name: intent, type: string, required: true, description: "意图" }
+            - { name: emotion, type: number, required: false, description: "情绪 1-5" }
+            - { name: order_id, type: string, required: false, description: "订单号" }
+
+      - id: "1734200004001"
+        type: custom
+        position: { x: 980, y: 582 }
+        data:
+          type: question-classifier
+          title: "L1 5 路分类"
+          desc: ""
+          query_variable_selector: ["sys", "query"]
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          classes:
+            - { id: "1", name: 退款 }
+            - { id: "2", name: 投诉 }
+            - { id: "3", name: 咨询 }
+            - { id: "4", name: bug }
+            - { id: "5", name: 其他 }
+          _targetBranches:
+            - { id: "1", name: 退款 }
+            - { id: "2", name: 投诉 }
+            - { id: "3", name: 咨询 }
+            - { id: "4", name: bug }
+            - { id: "5", name: 其他 }
+          vision: { enabled: false }
+
+      # ===== 退款 =====
+      - id: "1734200005001"
+        type: custom
+        position: { x: 1280, y: 82 }
+        data:
+          type: http-request
+          title: 查订单
+          desc: ""
+          method: get
+          url: "https://api.order.com/{{#1734200003001.order_id#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200005002"
+        type: custom
+        position: { x: 1580, y: 82 }
+        data:
+          type: if-else
+          title: 7天内?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: string, comparison_operator: contains, value: "recent", variable_selector: ["1734200005001", "body"] }
+
+      - id: "1734200005003"
+        type: custom
+        position: { x: 1880, y: 0 }
+        data:
+          type: http-request
+          title: 自动退款
+          desc: ""
+          method: post
+          url: "https://api.refund.com/create"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734200003001.order_id#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200005004"
+        type: custom
+        position: { x: 1880, y: 160 }
+        data:
+          type: question-classifier
+          title: L2 退款原因
+          desc: ""
+          query_variable_selector: ["sys", "query"]
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          classes:
+            - { id: "1", name: 质量 }
+            - { id: "2", name: 运输 }
+            - { id: "3", name: 不想要 }
+          _targetBranches:
+            - { id: "1", name: 质量 }
+            - { id: "2", name: 运输 }
+            - { id: "3", name: 不想要 }
+          vision: { enabled: false }
+
+      - id: "1734200005005"
+        type: custom
+        position: { x: 2180, y: 80 }
+        data:
+          type: llm
+          title: 质量话术
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template: [{ role: system, text: "质量问题退款话术" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200005006"
+        type: custom
+        position: { x: 2180, y: 180 }
+        data:
+          type: llm
+          title: 运输话术
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template: [{ role: system, text: "运输问题话术" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200005007"
+        type: custom
+        position: { x: 2180, y: 280 }
+        data:
+          type: llm
+          title: 其他话术
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template: [{ role: system, text: "一般退款话术" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200005008"
+        type: custom
+        position: { x: 2480, y: 180 }
+        data:
+          type: variable-aggregator
+          title: 退款合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734200005003", "body"]
+            - ["1734200005005", "text"]
+            - ["1734200005006", "text"]
+            - ["1734200005007", "text"]
+
+      # ===== 投诉 =====
+      - id: "1734200006001"
+        type: custom
+        position: { x: 1280, y: 482 }
+        data:
+          type: llm
+          title: 情绪分析
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "输出情绪分 1-5" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          structured_output_enabled: true
+          structured_output:
+            schema:
+              type: object
+              properties:
+                score: { type: number, description: "1-5" }
+              required: ["score"]
+              additionalProperties: false
+
+      - id: "1734200006002"
+        type: custom
+        position: { x: 1580, y: 482 }
+        data:
+          type: if-else
+          title: 情绪 < 3?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: number, comparison_operator: "<", value: "3", variable_selector: ["1734200006001", "score"] }
+
+      - id: "1734200006003"
+        type: custom
+        position: { x: 1880, y: 420 }
+        data:
+          type: http-request
+          title: Slack 转人工
+          desc: ""
+          method: post
+          url: "https://hooks.slack.com/services/XXX"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#sys.query#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200006004"
+        type: custom
+        position: { x: 1880, y: 540 }
+        data:
+          type: llm
+          title: 安抚话术
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template: [{ role: system, text: "温和安抚" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200006005"
+        type: custom
+        position: { x: 2180, y: 482 }
+        data:
+          type: variable-aggregator
+          title: 投诉合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734200006003", "body"]
+            - ["1734200006004", "text"]
+
+      # ===== 咨询 =====
+      - id: "1734200007001"
+        type: custom
+        position: { x: 1280, y: 782 }
+        data:
+          type: code
+          title: KB 列表
+          desc: ""
+          code_language: python3
+          code: |
+            def main() -> dict:
+                return {"kbs": ["kb1", "kb2", "kb3"]}
+          variables: []
+          outputs:
+            kbs: { type: "array[string]", children: null }
+
+      - id: "1734200007002"
+        type: custom
+        position: { x: 1580, y: 782 }
+        data:
+          type: iteration
+          title: 遍历知识库
+          desc: ""
+          start_node_id: "1734200007002start"
+          iterator_selector: ["1734200007001", "kbs"]
+          iterator_input_type: "array[string]"
+          output_selector: ["1734200007004", "text"]
+          output_type: "array[string]"
+          is_parallel: true
+          parallel_nums: 3
+          error_handle_mode: remove-abnormal-output
+          flatten_output: false
+          width: 700
+          height: 200
+        width: 700
+        height: 200
+        zIndex: 1
+
+      - id: "1734200007002start"
+        type: custom-iteration-start
+        parentId: "1734200007002"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734200007003"
+        type: custom
+        parentId: "1734200007002"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: knowledge-retrieval
+          title: 检索
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734200007002"
+          query_variable_selector: ["sys", "query"]
+          dataset_ids: []
+          retrieval_mode: multiple
+          multiple_retrieval_config: { top_k: 3, reranking_enable: false }
+
+      - id: "1734200007004"
+        type: custom
+        parentId: "1734200007002"
+        position: { x: 340, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 片段总结
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734200007002"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template:
+            - { role: system, text: "总结检索片段" }
+            - { role: user, text: "{{#1734200007003.result#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200007005"
+        type: custom
+        position: { x: 2380, y: 782 }
+        data:
+          type: llm
+          title: 融合答案
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template:
+            - { role: system, text: "融合多知识库答案" }
+            - { role: user, text: "{{#1734200007002.output#}}\n问题: {{#sys.query#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      # ===== bug =====
+      - id: "1734200008001"
+        type: custom
+        position: { x: 1280, y: 1082 }
+        data:
+          type: knowledge-retrieval
+          title: 查 FAQ
+          desc: ""
+          query_variable_selector: ["sys", "query"]
+          dataset_ids: []
+          retrieval_mode: multiple
+          multiple_retrieval_config: { top_k: 3, reranking_enable: false }
+
+      - id: "1734200008002"
+        type: custom
+        position: { x: 1580, y: 1082 }
+        data:
+          type: llm
+          title: 命中判断
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template: [{ role: system, text: "判断 FAQ 是否命中，输出 yes/no" }, { role: user, text: "{{#1734200008001.result#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200008003"
+        type: custom
+        position: { x: 1880, y: 1082 }
+        data:
+          type: if-else
+          title: 命中?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: string, comparison_operator: contains, value: "yes", variable_selector: ["1734200008002", "text"] }
+
+      - id: "1734200008004"
+        type: custom
+        position: { x: 2180, y: 1000 }
+        data:
+          type: llm
+          title: FAQ 答复
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template: [{ role: system, text: "基于 FAQ 答复" }, { role: user, text: "{{#1734200008001.result#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200008005"
+        type: custom
+        position: { x: 2180, y: 1140 }
+        data:
+          type: http-request
+          title: 创建 Jira
+          desc: ""
+          method: post
+          url: "https://api.jira.com/issue"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#sys.query#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734200008006"
+        type: custom
+        position: { x: 2480, y: 1140 }
+        data:
+          type: llm
+          title: 等待话术
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.4 } }
+          prompt_template: [{ role: system, text: "告知已开工单请等待" }, { role: user, text: "{{#1734200008005.body#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734200008007"
+        type: custom
+        position: { x: 2780, y: 1082 }
+        data:
+          type: variable-aggregator
+          title: bug 合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734200008004", "text"]
+            - ["1734200008006", "text"]
+
+      # ===== 其他 =====
+      - id: "1734200009001"
+        type: custom
+        position: { x: 1280, y: 1382 }
+        data:
+          type: llm
+          title: 兜底回复
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template: [{ role: system, text: "友好兜底" }, { role: user, text: "{{#sys.query#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      # ===== 5 路合流 =====
+      - id: "1734200010001"
+        type: custom
+        position: { x: 3080, y: 782 }
+        data:
+          type: variable-aggregator
+          title: 5 路合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734200005008", "output"]
+            - ["1734200006005", "output"]
+            - ["1734200007005", "text"]
+            - ["1734200008007", "output"]
+            - ["1734200009001", "text"]
+
+      - id: "1734200011001"
+        type: custom
+        position: { x: 3380, y: 782 }
+        data:
+          type: llm
+          title: 统一语气
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template: [{ role: system, text: "改写成统一客服语气" }, { role: user, text: "{{#1734200010001.output#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          memory:
+            query_prompt_template: "{{#sys.query#}}"
+            window: { enabled: true, size: 10 }
+
+      - id: "1734200012001"
+        type: custom
+        position: { x: 3680, y: 782 }
+        data:
+          type: template-transform
+          title: 加签名
+          desc: ""
+          template: "{{ content }}\n\n— AI 客服 {{ user_tier }}"
+          variables:
+            - { variable: content, value_selector: ["1734200011001", "text"] }
+            - { variable: user_tier, value_selector: ["1734200001001", "user_tier"] }
+
+      - id: "1734200013001"
+        type: custom
+        position: { x: 3980, y: 782 }
+        data:
+          type: answer
+          title: Answer
+          desc: ""
+          answer: "{{#1734200012001.output#}}"
+          variables: []
+
+      # 旁路埋点
+      - id: "1734200014001"
+        type: custom
+        position: { x: 3380, y: 1082 }
+        data:
+          type: code
+          title: 埋点数据
+          desc: ""
+          code_language: python3
+          code: |
+            def main(intent: str, emotion) -> dict:
+                return {"event": {"intent": intent, "emotion": emotion}}
+          variables:
+            - { variable: intent, value_selector: ["1734200003001", "intent"] }
+            - { variable: emotion, value_selector: ["1734200003001", "emotion"] }
+          outputs:
+            event: { type: object, children: null }
+
+      - id: "1734200014002"
+        type: custom
+        position: { x: 3680, y: 1082 }
+        data:
+          type: http-request
+          title: 写数仓
+          desc: ""
+          method: post
+          url: "https://api.warehouse.com/events"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734200014001.event#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+    edges:
+      - { id: "e1", source: "1734200001001", sourceHandle: source, target: "1734200002001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e2", source: "1734200001001", sourceHandle: source, target: "1734200002002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e3", source: "1734200002001", sourceHandle: source, target: "1734200003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: parameter-extractor } }
+      - { id: "e4", source: "1734200002002", sourceHandle: source, target: "1734200003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: parameter-extractor } }
+      - { id: "e5", source: "1734200003001", sourceHandle: source, target: "1734200004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: parameter-extractor, targetType: question-classifier } }
+      # L1 分路
+      - { id: "e6", source: "1734200004001", sourceHandle: "1", target: "1734200005001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: http-request } }
+      - { id: "e7", source: "1734200004001", sourceHandle: "2", target: "1734200006001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e8", source: "1734200004001", sourceHandle: "3", target: "1734200007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: code } }
+      - { id: "e9", source: "1734200004001", sourceHandle: "4", target: "1734200008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: knowledge-retrieval } }
+      - { id: "e10", source: "1734200004001", sourceHandle: "5", target: "1734200009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      # 退款链
+      - { id: "e11", source: "1734200005001", sourceHandle: source, target: "1734200005002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: if-else } }
+      - { id: "e12", source: "1734200005002", sourceHandle: "true", target: "1734200005003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: http-request } }
+      - { id: "e13", source: "1734200005002", sourceHandle: "false", target: "1734200005004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: question-classifier } }
+      - { id: "e14", source: "1734200005004", sourceHandle: "1", target: "1734200005005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e15", source: "1734200005004", sourceHandle: "2", target: "1734200005006", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e16", source: "1734200005004", sourceHandle: "3", target: "1734200005007", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e17", source: "1734200005003", sourceHandle: source, target: "1734200005008", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e18", source: "1734200005005", sourceHandle: source, target: "1734200005008", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e19", source: "1734200005006", sourceHandle: source, target: "1734200005008", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e20", source: "1734200005007", sourceHandle: source, target: "1734200005008", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      # 投诉链
+      - { id: "e21", source: "1734200006001", sourceHandle: source, target: "1734200006002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: if-else } }
+      - { id: "e22", source: "1734200006002", sourceHandle: "true", target: "1734200006003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: http-request } }
+      - { id: "e23", source: "1734200006002", sourceHandle: "false", target: "1734200006004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: llm } }
+      - { id: "e24", source: "1734200006003", sourceHandle: source, target: "1734200006005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e25", source: "1734200006004", sourceHandle: source, target: "1734200006005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      # 咨询链
+      - { id: "e26", source: "1734200007001", sourceHandle: source, target: "1734200007002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e27", source: "1734200007002start", sourceHandle: source, target: "1734200007003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734200007002", sourceType: iteration-start, targetType: knowledge-retrieval } }
+      - { id: "e28", source: "1734200007003", sourceHandle: source, target: "1734200007004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734200007002", sourceType: knowledge-retrieval, targetType: llm } }
+      - { id: "e29", source: "1734200007002", sourceHandle: source, target: "1734200007005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: llm } }
+      # bug 链
+      - { id: "e30", source: "1734200008001", sourceHandle: source, target: "1734200008002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: knowledge-retrieval, targetType: llm } }
+      - { id: "e31", source: "1734200008002", sourceHandle: source, target: "1734200008003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: if-else } }
+      - { id: "e32", source: "1734200008003", sourceHandle: "true", target: "1734200008004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: llm } }
+      - { id: "e33", source: "1734200008003", sourceHandle: "false", target: "1734200008005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: http-request } }
+      - { id: "e34", source: "1734200008005", sourceHandle: source, target: "1734200008006", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: llm } }
+      - { id: "e35", source: "1734200008004", sourceHandle: source, target: "1734200008007", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e36", source: "1734200008006", sourceHandle: source, target: "1734200008007", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      # 5 路合流
+      - { id: "e37", source: "1734200005008", sourceHandle: source, target: "1734200010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: variable-aggregator } }
+      - { id: "e38", source: "1734200006005", sourceHandle: source, target: "1734200010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: variable-aggregator } }
+      - { id: "e39", source: "1734200007005", sourceHandle: source, target: "1734200010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e40", source: "1734200008007", sourceHandle: source, target: "1734200010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: variable-aggregator } }
+      - { id: "e41", source: "1734200009001", sourceHandle: source, target: "1734200010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e42", source: "1734200010001", sourceHandle: source, target: "1734200011001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: llm } }
+      - { id: "e43", source: "1734200011001", sourceHandle: source, target: "1734200012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: template-transform } }
+      - { id: "e44", source: "1734200012001", sourceHandle: source, target: "1734200013001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: answer } }
+      # 旁路
+      - { id: "e45", source: "1734200003001", sourceHandle: source, target: "1734200014001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: parameter-extractor, targetType: code } }
+      - { id: "e46", source: "1734200014001", sourceHandle: source, target: "1734200014002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: http-request } }
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.4

@@ -1,0 +1,603 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "金融研报自动生成与风控审核"
+  mode: workflow
+  icon: "\U0001F4C8"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "股票代码 → 5路并行采集 → 分章 Iteration 自评重写 → 结论分路模板 → 3路风控 → 发布或转人工"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload: { enabled: false }
+    opening_statement: ""
+    retriever_resource: { enabled: false }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+  graph:
+    nodes:
+      - id: "1734100001001"
+        type: custom
+        position: { x: 80, y: 482 }
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            - { variable: ticker, label: 股票代码, type: text-input, required: true, max_length: 20 }
+            - { variable: dimensions, label: 分析维度, type: paragraph, required: false, max_length: 200 }
+
+      # ===== 5 路并行采集 =====
+      - id: "1734100002001"
+        type: custom
+        position: { x: 380, y: 82 }
+        data:
+          type: http-request
+          title: 财报 API
+          desc: ""
+          method: get
+          url: "https://api.finance.com/report?ticker={{#1734100001001.ticker#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100002002"
+        type: custom
+        position: { x: 380, y: 282 }
+        data:
+          type: http-request
+          title: 新闻 API
+          desc: ""
+          method: get
+          url: "https://api.news.com/search?q={{#1734100001001.ticker#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100002003"
+        type: custom
+        position: { x: 380, y: 482 }
+        data:
+          type: http-request
+          title: 舆情 API
+          desc: ""
+          method: get
+          url: "https://api.sentiment.com/feed?q={{#1734100001001.ticker#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100002004"
+        type: custom
+        position: { x: 380, y: 682 }
+        data:
+          type: knowledge-retrieval
+          title: 历史研报库
+          desc: ""
+          query_variable_selector: ["1734100001001", "ticker"]
+          dataset_ids: []
+          retrieval_mode: "multiple"
+          multiple_retrieval_config: { top_k: 5, reranking_enable: false }
+
+      - id: "1734100002005"
+        type: custom
+        position: { x: 380, y: 882 }
+        data:
+          type: tool
+          title: 技术指标
+          desc: ""
+          provider_id: "tech_indicator"
+          provider_type: "api"
+          provider_name: "tech_indicator"
+          tool_name: "compute"
+          tool_label: "Tech Indicators"
+          tool_configurations: {}
+          tool_parameters:
+            ticker: { type: mixed, value: "{{#1734100001001.ticker#}}" }
+
+      # 5 路清洗+摘要
+      - id: "1734100003001"
+        type: custom
+        position: { x: 680, y: 82 }
+        data:
+          type: llm
+          title: 财报摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.2 } }
+          prompt_template:
+            - { role: system, text: "总结财务要点" }
+            - { role: user, text: "{{#1734100002001.body#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100003002"
+        type: custom
+        position: { x: 680, y: 282 }
+        data:
+          type: llm
+          title: 新闻摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.2 } }
+          prompt_template:
+            - { role: system, text: "总结近期新闻" }
+            - { role: user, text: "{{#1734100002002.body#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100003003"
+        type: custom
+        position: { x: 680, y: 482 }
+        data:
+          type: llm
+          title: 舆情摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.2 } }
+          prompt_template:
+            - { role: system, text: "总结社交情绪" }
+            - { role: user, text: "{{#1734100002003.body#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100003004"
+        type: custom
+        position: { x: 680, y: 682 }
+        data:
+          type: llm
+          title: 历史研报摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.2 } }
+          prompt_template:
+            - { role: system, text: "总结历史研报观点" }
+            - { role: user, text: "{{#1734100002004.result#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100003005"
+        type: custom
+        position: { x: 680, y: 882 }
+        data:
+          type: llm
+          title: 技术面摘要
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.2 } }
+          prompt_template:
+            - { role: system, text: "总结技术指标" }
+            - { role: user, text: "{{#1734100002005.text#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100004001"
+        type: custom
+        position: { x: 980, y: 482 }
+        data:
+          type: code
+          title: 合并 5 路素材
+          desc: ""
+          code_language: python3
+          code: |
+            def main(fin, news, senti, hist, tech) -> dict:
+                return {"bundle": {"fin": fin, "news": news, "senti": senti, "hist": hist, "tech": tech}, "chapters": ["财务", "行业", "风险", "估值"]}
+          variables:
+            - { variable: fin, value_selector: ["1734100003001", "text"] }
+            - { variable: news, value_selector: ["1734100003002", "text"] }
+            - { variable: senti, value_selector: ["1734100003003", "text"] }
+            - { variable: hist, value_selector: ["1734100003004", "text"] }
+            - { variable: tech, value_selector: ["1734100003005", "text"] }
+          outputs:
+            bundle: { type: object, children: null }
+            chapters: { type: "array[string]", children: null }
+
+      # ===== Iteration: 四章自评重写 =====
+      - id: "1734100005001"
+        type: custom
+        position: { x: 1280, y: 482 }
+        data:
+          type: iteration
+          title: "Iter: 分章撰写+自评"
+          desc: ""
+          start_node_id: "1734100005001start"
+          iterator_selector: ["1734100004001", "chapters"]
+          iterator_input_type: "array[string]"
+          output_selector: ["1734100005006", "result"]
+          output_type: "array[string]"
+          is_parallel: false
+          parallel_nums: 1
+          error_handle_mode: terminated
+          flatten_output: false
+          width: 1400
+          height: 300
+        width: 1400
+        height: 300
+        zIndex: 1
+
+      - id: "1734100005001start"
+        type: custom-iteration-start
+        parentId: "1734100005001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734100005002"
+        type: custom
+        parentId: "1734100005001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 撰写章节
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734100005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.6 } }
+          prompt_template:
+            - { role: system, text: "你是金融分析师，撰写研报章节" }
+            - { role: user, text: "章节: {{#1734100005001.item#}}\n素材: {{#1734100004001.bundle#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100005003"
+        type: custom
+        parentId: "1734100005001"
+        position: { x: 340, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 自我评分
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734100005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template:
+            - { role: system, text: "给研报章节打 0-10 分" }
+            - { role: user, text: "{{#1734100005002.text#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          structured_output_enabled: true
+          structured_output:
+            schema:
+              type: object
+              properties:
+                score: { type: number, description: "0-10" }
+              required: ["score"]
+              additionalProperties: false
+
+      - id: "1734100005004"
+        type: custom
+        parentId: "1734100005001"
+        position: { x: 580, y: 68 }
+        zIndex: 1002
+        data:
+          type: if-else
+          title: "分数 >= 8?"
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734100005001"
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: "c1", varType: number, comparison_operator: "\u2265", value: "8", variable_selector: ["1734100005003", "score"] }
+
+      - id: "1734100005005"
+        type: custom
+        parentId: "1734100005001"
+        position: { x: 820, y: 160 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 重写章节
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734100005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.4 } }
+          prompt_template:
+            - { role: system, text: "根据初版重写，提升严谨度" }
+            - { role: user, text: "初版: {{#1734100005002.text#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734100005006"
+        type: custom
+        parentId: "1734100005001"
+        position: { x: 1080, y: 68 }
+        zIndex: 1002
+        data:
+          type: variable-aggregator
+          title: 章节产出
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734100005001"
+          output_type: string
+          variables:
+            - ["1734100005002", "text"]
+            - ["1734100005005", "text"]
+
+      # ===== 分结论路由 =====
+      - id: "1734100006001"
+        type: custom
+        position: { x: 2780, y: 482 }
+        data:
+          type: question-classifier
+          title: 结论路由
+          desc: ""
+          query_variable_selector: ["1734100005001", "output"]
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          classes:
+            - { id: "1", name: "买入" }
+            - { id: "2", name: "持有" }
+            - { id: "3", name: "卖出" }
+          _targetBranches:
+            - { id: "1", name: "买入" }
+            - { id: "2", name: "持有" }
+            - { id: "3", name: "卖出" }
+          vision: { enabled: false }
+
+      - id: "1734100007001"
+        type: custom
+        position: { x: 3080, y: 282 }
+        data:
+          type: template-transform
+          title: 买入模板
+          desc: ""
+          template: "【买入】{{ chapters }}\n免责声明：..."
+          variables:
+            - { variable: chapters, value_selector: ["1734100005001", "output"] }
+
+      - id: "1734100007002"
+        type: custom
+        position: { x: 3080, y: 482 }
+        data:
+          type: template-transform
+          title: 持有模板
+          desc: ""
+          template: "【持有】{{ chapters }}\n免责声明：..."
+          variables:
+            - { variable: chapters, value_selector: ["1734100005001", "output"] }
+
+      - id: "1734100007003"
+        type: custom
+        position: { x: 3080, y: 682 }
+        data:
+          type: template-transform
+          title: 卖出模板
+          desc: ""
+          template: "【卖出】{{ chapters }}\n免责声明：..."
+          variables:
+            - { variable: chapters, value_selector: ["1734100005001", "output"] }
+
+      - id: "1734100008001"
+        type: custom
+        position: { x: 3380, y: 482 }
+        data:
+          type: variable-aggregator
+          title: 合流结论
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734100007001", "output"]
+            - ["1734100007002", "output"]
+            - ["1734100007003", "output"]
+
+      # ===== 3 路并行风控 =====
+      - id: "1734100009001"
+        type: custom
+        position: { x: 3680, y: 282 }
+        data:
+          type: llm
+          title: 敏感词检测
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          prompt_template:
+            - { role: system, text: "检测敏感词，输出 pass/fail" }
+            - { role: user, text: "{{#1734100008001.output#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          structured_output_enabled: true
+          structured_output:
+            schema:
+              type: object
+              properties:
+                status: { type: string, description: "pass 或 fail" }
+              required: ["status"]
+              additionalProperties: false
+
+      - id: "1734100009002"
+        type: custom
+        position: { x: 3680, y: 482 }
+        data:
+          type: code
+          title: 数字一致性
+          desc: ""
+          code_language: python3
+          code: |
+            import re
+            def main(text: str) -> dict:
+                nums = re.findall(r"\d+\.?\d*", text or "")
+                return {"status": "pass" if len(nums) < 1000 else "fail"}
+          variables:
+            - { variable: text, value_selector: ["1734100008001", "output"] }
+          outputs:
+            status: { type: string, children: null }
+
+      - id: "1734100009003"
+        type: custom
+        position: { x: 3680, y: 682 }
+        data:
+          type: http-request
+          title: 监管黑名单
+          desc: ""
+          method: post
+          url: "https://api.regulator.gov/check"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734100008001.output#}}" }]
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100010001"
+        type: custom
+        position: { x: 3980, y: 482 }
+        data:
+          type: code
+          title: 合流风控结果
+          desc: ""
+          code_language: python3
+          code: |
+            def main(a, b, c) -> dict:
+                ok = a == "pass" and b == "pass" and "fail" not in (c or "").lower()
+                return {"all_pass": "yes" if ok else "no"}
+          variables:
+            - { variable: a, value_selector: ["1734100009001", "status"] }
+            - { variable: b, value_selector: ["1734100009002", "status"] }
+            - { variable: c, value_selector: ["1734100009003", "body"] }
+          outputs:
+            all_pass: { type: string, children: null }
+
+      - id: "1734100011001"
+        type: custom
+        position: { x: 4280, y: 482 }
+        data:
+          type: if-else
+          title: 全部通过?
+          desc: ""
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: "c1", varType: string, comparison_operator: "is", value: "yes", variable_selector: ["1734100010001", "all_pass"] }
+
+      - id: "1734100012001"
+        type: custom
+        position: { x: 4580, y: 282 }
+        data:
+          type: http-request
+          title: 发布研报
+          desc: ""
+          method: post
+          url: "https://api.research.com/publish"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734100008001.output#}}" }]
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100012002"
+        type: custom
+        position: { x: 4580, y: 682 }
+        data:
+          type: http-request
+          title: 转人工审核
+          desc: ""
+          method: post
+          url: "https://api.review.com/queue"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734100008001.output#}}" }]
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734100013001"
+        type: custom
+        position: { x: 4880, y: 482 }
+        data:
+          type: variable-aggregator
+          title: 终点合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734100012001", "body"]
+            - ["1734100012002", "body"]
+
+      - id: "1734100014001"
+        type: custom
+        position: { x: 5180, y: 482 }
+        data:
+          type: end
+          title: End
+          desc: ""
+          outputs:
+            - { variable: report, value_selector: ["1734100008001", "output"], value_type: string }
+            - { variable: delivery_status, value_selector: ["1734100013001", "output"], value_type: string }
+
+    edges:
+      - { id: "e1", source: "1734100001001", sourceHandle: source, target: "1734100002001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e2", source: "1734100001001", sourceHandle: source, target: "1734100002002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e3", source: "1734100001001", sourceHandle: source, target: "1734100002003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e4", source: "1734100001001", sourceHandle: source, target: "1734100002004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: knowledge-retrieval } }
+      - { id: "e5", source: "1734100001001", sourceHandle: source, target: "1734100002005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: tool } }
+      - { id: "e6", source: "1734100002001", sourceHandle: source, target: "1734100003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: llm } }
+      - { id: "e7", source: "1734100002002", sourceHandle: source, target: "1734100003002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: llm } }
+      - { id: "e8", source: "1734100002003", sourceHandle: source, target: "1734100003003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: llm } }
+      - { id: "e9", source: "1734100002004", sourceHandle: source, target: "1734100003004", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: knowledge-retrieval, targetType: llm } }
+      - { id: "e10", source: "1734100002005", sourceHandle: source, target: "1734100003005", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: tool, targetType: llm } }
+      - { id: "e11", source: "1734100003001", sourceHandle: source, target: "1734100004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e12", source: "1734100003002", sourceHandle: source, target: "1734100004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e13", source: "1734100003003", sourceHandle: source, target: "1734100004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e14", source: "1734100003004", sourceHandle: source, target: "1734100004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e15", source: "1734100003005", sourceHandle: source, target: "1734100004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e16", source: "1734100004001", sourceHandle: source, target: "1734100005001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e17", source: "1734100005001start", sourceHandle: source, target: "1734100005002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: iteration-start, targetType: llm } }
+      - { id: "e18", source: "1734100005002", sourceHandle: source, target: "1734100005003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: llm, targetType: llm } }
+      - { id: "e19", source: "1734100005003", sourceHandle: source, target: "1734100005004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: llm, targetType: if-else } }
+      - { id: "e20", source: "1734100005004", sourceHandle: "true", target: "1734100005006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: if-else, targetType: variable-aggregator } }
+      - { id: "e21", source: "1734100005004", sourceHandle: "false", target: "1734100005005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: if-else, targetType: llm } }
+      - { id: "e22", source: "1734100005005", sourceHandle: source, target: "1734100005006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734100005001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e23", source: "1734100005001", sourceHandle: source, target: "1734100006001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: question-classifier } }
+      - { id: "e24", source: "1734100006001", sourceHandle: "1", target: "1734100007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: template-transform } }
+      - { id: "e25", source: "1734100006001", sourceHandle: "2", target: "1734100007002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: template-transform } }
+      - { id: "e26", source: "1734100006001", sourceHandle: "3", target: "1734100007003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: template-transform } }
+      - { id: "e27", source: "1734100007001", sourceHandle: source, target: "1734100008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: variable-aggregator } }
+      - { id: "e28", source: "1734100007002", sourceHandle: source, target: "1734100008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: variable-aggregator } }
+      - { id: "e29", source: "1734100007003", sourceHandle: source, target: "1734100008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: template-transform, targetType: variable-aggregator } }
+      - { id: "e30", source: "1734100008001", sourceHandle: source, target: "1734100009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: llm } }
+      - { id: "e31", source: "1734100008001", sourceHandle: source, target: "1734100009002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: code } }
+      - { id: "e32", source: "1734100008001", sourceHandle: source, target: "1734100009003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: http-request } }
+      - { id: "e33", source: "1734100009001", sourceHandle: source, target: "1734100010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: code } }
+      - { id: "e34", source: "1734100009002", sourceHandle: source, target: "1734100010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: code } }
+      - { id: "e35", source: "1734100009003", sourceHandle: source, target: "1734100010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: code } }
+      - { id: "e36", source: "1734100010001", sourceHandle: source, target: "1734100011001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: if-else } }
+      - { id: "e37", source: "1734100011001", sourceHandle: "true", target: "1734100012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: http-request } }
+      - { id: "e38", source: "1734100011001", sourceHandle: "false", target: "1734100012002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: if-else, targetType: http-request } }
+      - { id: "e39", source: "1734100012001", sourceHandle: source, target: "1734100013001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e40", source: "1734100012002", sourceHandle: source, target: "1734100013001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e41", source: "1734100013001", sourceHandle: source, target: "1734100014001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: end } }
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.4

@@ -1,0 +1,401 @@
+schema_version: 1.0.0
+name: loop_workflow
+id: 7585079438426600002
+description: "循环处理示例：Start → LLM(拆分) → Loop(LLM处理每项) → LLM(汇总) → End"
+mode: workflow
+icon: plugin_icon/workflow.png
+nodes:
+    - id: "100001"
+      type: start
+      title: 开始
+      icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-Start-v2.jpg
+      description: "工作流的起始节点，用于设定启动工作流需要的信息"
+      position:
+        x: -1800
+        y: 0
+      parameters:
+        node_outputs:
+            input:
+                type: string
+                required: true
+                value: null
+    - id: "200001"
+      type: llm
+      title: 任务拆分
+      icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-LLM-v2.jpg
+      description: "调用大语言模型,使用变量和提示词生成回复"
+      version: "3"
+      position:
+        x: -1200
+        y: 0
+      parameters:
+        fcParamVar:
+            knowledgeFCParam: {}
+        llmParam:
+            - name: apiMode
+              input:
+                type: integer
+                value: "0"
+            - name: maxTokens
+              input:
+                type: integer
+                value: "4096"
+            - name: spCurrentTime
+              input:
+                type: boolean
+                value: false
+            - name: spAntiLeak
+              input:
+                type: boolean
+                value: false
+            - name: responseFormat
+              input:
+                type: integer
+                value: "2"
+            - name: modelName
+              input:
+                type: string
+                value: Kimi-K2-250905
+            - name: modelType
+              input:
+                type: integer
+                value: "1763350148"
+            - name: generationDiversity
+              input:
+                type: string
+                value: balance
+            - name: parameters
+              input:
+                type: object
+                value: null
+            - name: prompt
+              input:
+                type: string
+                value: "{{input}}"
+            - name: enableChatHistory
+              input:
+                type: boolean
+                value: false
+            - name: chatHistoryRound
+              input:
+                type: integer
+                value: "3"
+            - name: systemPrompt
+              input:
+                type: string
+                value: "将用户输入拆分为多个子任务，输出JSON数组"
+            - name: stableSystemPrompt
+              input:
+                type: string
+                value: ""
+            - name: canContinue
+              input:
+                type: boolean
+                value: false
+            - name: loopPromptVersion
+              input:
+                type: string
+                value: ""
+            - name: loopPromptName
+              input:
+                type: string
+                value: ""
+            - name: loopPromptId
+              input:
+                type: string
+                value: ""
+        node_inputs:
+            - name: input
+              input:
+                type: string
+                value:
+                    path: input
+                    ref_node: "100001"
+        node_outputs:
+            output:
+                type: string
+                value: null
+        settingOnError:
+            processType: 1
+            retryTimes: 0
+            switch: false
+            timeoutMs: 180000
+    - id: "200002"
+      type: loop
+      title: 循环处理子任务
+      icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-Loop-v2.jpg
+      description: "用于通过设定循环次数和逻辑，重复执行一系列任务"
+      position:
+        x: -400
+        y: 0
+      canvas_position:
+        x: -600
+        y: 200
+      parameters:
+        loopCount:
+            type: integer
+            value:
+                content: 10
+                rawMeta:
+                    type: 2
+                type: literal
+        loopType: array
+        node_inputs:
+            - name: input
+              input:
+                type: list
+                items:
+                    type: string
+                    value: null
+                value:
+                    path: output
+                    ref_node: "200001"
+        node_outputs:
+            output:
+                value:
+                    type: list
+                    items:
+                        type: string
+                        value: null
+                    value:
+                        path: output
+                        ref_node: "301001"
+        variableParameters: []
+      nodes:
+        - id: "301001"
+          type: llm
+          title: 处理单项
+          icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-LLM-v2.jpg
+          description: "调用大语言模型"
+          version: "3"
+          position:
+            x: 180
+            y: 0
+          parameters:
+            fcParamVar:
+                knowledgeFCParam: {}
+            llmParam:
+                - name: apiMode
+                  input:
+                    type: integer
+                    value: "0"
+                - name: maxTokens
+                  input:
+                    type: integer
+                    value: "4096"
+                - name: spCurrentTime
+                  input:
+                    type: boolean
+                    value: false
+                - name: spAntiLeak
+                  input:
+                    type: boolean
+                    value: false
+                - name: responseFormat
+                  input:
+                    type: integer
+                    value: "2"
+                - name: modelName
+                  input:
+                    type: string
+                    value: Kimi-K2-250905
+                - name: modelType
+                  input:
+                    type: integer
+                    value: "1763350148"
+                - name: generationDiversity
+                  input:
+                    type: string
+                    value: balance
+                - name: parameters
+                  input:
+                    type: object
+                    value: null
+                - name: prompt
+                  input:
+                    type: string
+                    value: "{{input}}"
+                - name: enableChatHistory
+                  input:
+                    type: boolean
+                    value: false
+                - name: chatHistoryRound
+                  input:
+                    type: integer
+                    value: "3"
+                - name: systemPrompt
+                  input:
+                    type: string
+                    value: "处理单个子任务，输出结果"
+                - name: stableSystemPrompt
+                  input:
+                    type: string
+                    value: ""
+                - name: canContinue
+                  input:
+                    type: boolean
+                    value: false
+                - name: loopPromptVersion
+                  input:
+                    type: string
+                    value: ""
+                - name: loopPromptName
+                  input:
+                    type: string
+                    value: ""
+                - name: loopPromptId
+                  input:
+                    type: string
+                    value: ""
+            node_inputs:
+                - name: input
+                  input:
+                    type: string
+                    value:
+                        path: input
+                        ref_node: "200002"
+            node_outputs:
+                output:
+                    type: string
+                    value: null
+            settingOnError:
+                processType: 1
+                retryTimes: 0
+                timeoutMs: 180000
+      edges:
+        - source_node: "200002"
+          target_node: "301001"
+          source_port: loop-function-inline-output
+        - source_node: "301001"
+          target_node: "200002"
+          target_port: loop-function-inline-input
+    - id: "200003"
+      type: llm
+      title: 汇总结果
+      icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-LLM-v2.jpg
+      description: "调用大语言模型,使用变量和提示词生成回复"
+      version: "3"
+      position:
+        x: 800
+        y: 0
+      parameters:
+        fcParamVar:
+            knowledgeFCParam: {}
+        llmParam:
+            - name: apiMode
+              input:
+                type: integer
+                value: "0"
+            - name: maxTokens
+              input:
+                type: integer
+                value: "4096"
+            - name: spCurrentTime
+              input:
+                type: boolean
+                value: false
+            - name: spAntiLeak
+              input:
+                type: boolean
+                value: false
+            - name: responseFormat
+              input:
+                type: integer
+                value: "2"
+            - name: modelName
+              input:
+                type: string
+                value: Kimi-K2-250905
+            - name: modelType
+              input:
+                type: integer
+                value: "1763350148"
+            - name: generationDiversity
+              input:
+                type: string
+                value: balance
+            - name: parameters
+              input:
+                type: object
+                value: null
+            - name: prompt
+              input:
+                type: string
+                value: "{{input}}"
+            - name: enableChatHistory
+              input:
+                type: boolean
+                value: false
+            - name: chatHistoryRound
+              input:
+                type: integer
+                value: "3"
+            - name: systemPrompt
+              input:
+                type: string
+                value: "汇总所有子任务结果，生成最终报告"
+            - name: stableSystemPrompt
+              input:
+                type: string
+                value: ""
+            - name: canContinue
+              input:
+                type: boolean
+                value: false
+            - name: loopPromptVersion
+              input:
+                type: string
+                value: ""
+            - name: loopPromptName
+              input:
+                type: string
+                value: ""
+            - name: loopPromptId
+              input:
+                type: string
+                value: ""
+        node_inputs:
+            - name: input
+              input:
+                type: list
+                items:
+                    type: string
+                    value: null
+                value:
+                    path: output
+                    ref_node: "200002"
+        node_outputs:
+            output:
+                type: string
+                value: null
+        settingOnError:
+            processType: 1
+            retryTimes: 0
+            switch: false
+            timeoutMs: 180000
+    - id: "900001"
+      type: end
+      title: 结束
+      icon: https://lf3-static.bytednsdoc.com/obj/eden-cn/dvsmryvd_avi_dvsm/ljhwZthlaukjlkulzlp/icon/icon-End-v2.jpg
+      description: "工作流的最终节点，用于返回工作流运行后的结果信息"
+      position:
+        x: 1800
+        y: 0
+      parameters:
+        node_inputs:
+            - name: output
+              input:
+                value:
+                    path: output
+                    ref_node: "200003"
+        terminatePlan: returnVariables
+edges:
+    - source_node: "100001"
+      target_node: "200001"
+    - source_node: "200001"
+      target_node: "200002"
+    - source_node: "200002"
+      target_node: "200003"
+      source_port: loop-output
+    - source_node: "200003"
+      target_node: "900001"

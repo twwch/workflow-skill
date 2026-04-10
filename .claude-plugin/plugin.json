@@ -1,0 +1,18 @@
+{
+  "name": "workflow-skill",
+  "description": "Workflow generation skills for Coze, Dify, and ComfyUI. Generate importable workflow definitions from natural language descriptions.",
+  "version": "1.0.0",
+  "author": {
+    "name": "chenhao"
+  },
+  "homepage": "https://github.com/chenhao/workflow-skill",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "coze",
+    "dify",
+    "comfyui",
+    "automation",
+    "low-code"
+  ]
+}

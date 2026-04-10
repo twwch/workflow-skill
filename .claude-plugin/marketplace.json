@@ -1,0 +1,12 @@
+{
+  "name": "workflow-skill",
+  "description": "Workflow generation marketplace for Coze, Dify, and ComfyUI",
+  "plugins": [
+    {
+      "name": "workflow-skill",
+      "description": "Generate importable workflows for Coze (coze.cn ZIP), Dify (YAML/JSON DSL), and ComfyUI (Litegraph JSON)",
+      "version": "1.0.0",
+      "source": "./"
+    }
+  ]
+}

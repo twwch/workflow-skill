@@ -1,0 +1,632 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "跨境电商全链路选品上架机器人"
+  mode: workflow
+  icon: "\U0001F30D"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "类目+市场+预算 → 拉 SKU → 双层 Iteration → 分类路由 → 多市场本地化 → 三平台并行上架"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload: { enabled: false }
+    opening_statement: ""
+    retriever_resource: { enabled: false }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+  graph:
+    nodes:
+      - id: "1734000001001"
+        type: custom
+        position: { x: 80, y: 282 }
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            - { variable: category, label: 类目, type: text-input, required: true, max_length: 50 }
+            - { variable: markets, label: 目标市场, type: paragraph, required: true, max_length: 200, placeholder: "US,JP,DE" }
+            - { variable: budget, label: 预算上限, type: number, required: true }
+
+      - id: "1734000002001"
+        type: custom
+        position: { x: 380, y: 282 }
+        data:
+          type: http-request
+          title: 拉取供应链候选 SKU
+          desc: ""
+          method: get
+          url: "https://api.1688.com/search?category={{#1734000001001.category#}}&budget={{#1734000001001.budget#}}"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: api-key, config: { type: bearer, api_key: "TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734000003001"
+        type: custom
+        position: { x: 680, y: 282 }
+        data:
+          type: code
+          title: 清洗去重过滤预算
+          desc: ""
+          code_language: python3
+          code: |
+            import json
+            def main(raw: str, budget: float) -> dict:
+                data = json.loads(raw) if isinstance(raw, str) else raw
+                items = data.get("items", []) if isinstance(data, dict) else data
+                seen, out = set(), []
+                for it in items:
+                    sku = it.get("sku")
+                    if sku and sku not in seen and it.get("price", 0) <= budget:
+                        seen.add(sku); out.append(it)
+                return {"skus": out}
+          variables:
+            - { variable: raw, value_selector: ["1734000002001", "body"] }
+            - { variable: budget, value_selector: ["1734000001001", "budget"] }
+          outputs:
+            skus: { type: "array[object]", children: null }
+
+      # ===== Iteration #1: 遍历 SKU 评估 =====
+      - id: "1734000004001"
+        type: custom
+        position: { x: 980, y: 282 }
+        data:
+          type: iteration
+          title: "Iter1: 评估每个 SKU"
+          desc: ""
+          start_node_id: "1734000004001start"
+          iterator_selector: ["1734000003001", "skus"]
+          iterator_input_type: "array[object]"
+          output_selector: ["1734000004007", "result"]
+          output_type: "array[object]"
+          is_parallel: true
+          parallel_nums: 5
+          error_handle_mode: "remove-abnormal-output"
+          flatten_output: false
+          width: 1400
+          height: 400
+        width: 1400
+        height: 400
+        zIndex: 1
+
+      - id: "1734000004001start"
+        type: custom-iteration-start
+        parentId: "1734000004001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data:
+          type: iteration-start
+          title: ""
+          desc: ""
+          isInIteration: true
+
+      - id: "1734000004002"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: http-request
+          title: 查销量历史
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          method: get
+          url: "https://api.1688.com/sales?sku={{#1734000004001.item.sku#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734000004003"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 320, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 爆款分预测
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          model:
+            provider: "langgenius/openai/openai"
+            name: "gpt-4o-mini"
+            mode: "chat"
+            completion_params: { temperature: 0.2 }
+          prompt_template:
+            - role: system
+              text: "你是爆款预测专家。根据 SKU 和销量数据输出 0-10 的分数。"
+            - role: user
+              text: "SKU: {{#1734000004001.item#}}\n销量: {{#1734000004002.body#}}"
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          structured_output_enabled: true
+          structured_output:
+            schema:
+              type: object
+              properties:
+                score: { type: number, description: "0-10" }
+              required: ["score"]
+              additionalProperties: false
+
+      - id: "1734000004004"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 540, y: 68 }
+        zIndex: 1002
+        data:
+          type: if-else
+          title: 分数 > 7?
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - id: "c1"
+                  varType: number
+                  comparison_operator: ">"
+                  value: "7"
+                  variable_selector: ["1734000004003", "score"]
+
+      - id: "1734000004005"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 760, y: 30 }
+        zIndex: 1002
+        data:
+          type: knowledge-retrieval
+          title: 合规黑名单
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          query_variable_selector: ["1734000004001", "item"]
+          dataset_ids: []
+          retrieval_mode: "multiple"
+          multiple_retrieval_config:
+            top_k: 3
+            reranking_enable: false
+
+      - id: "1734000004006"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 980, y: 30 }
+        zIndex: 1002
+        data:
+          type: parameter-extractor
+          title: 抽取关键参数
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          model:
+            provider: "langgenius/openai/openai"
+            name: "gpt-4o-mini"
+            mode: "chat"
+            completion_params: { temperature: 0 }
+          query: ["1734000004001", "item"]
+          reasoning_mode: "function_call"
+          parameters:
+            - { name: "material", type: string, required: false, description: "材质" }
+            - { name: "weight", type: number, required: false, description: "重量(g)" }
+            - { name: "color", type: string, required: false, description: "颜色" }
+
+      - id: "1734000004007"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 1200, y: 30 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 打包评估结果
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          code_language: python3
+          code: |
+            def main(item, score, compliance, params) -> dict:
+                return {"result": {"item": item, "score": score, "compliance": compliance, "params": params, "passed": True}}
+          variables:
+            - { variable: item, value_selector: ["1734000004001", "item"] }
+            - { variable: score, value_selector: ["1734000004003", "score"] }
+            - { variable: compliance, value_selector: ["1734000004005", "result"] }
+            - { variable: params, value_selector: ["1734000004006", "__reason"] }
+          outputs:
+            result: { type: object, children: null }
+
+      - id: "1734000004008"
+        type: custom
+        parentId: "1734000004001"
+        position: { x: 760, y: 200 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 丢弃占位
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000004001"
+          code_language: python3
+          code: |
+            def main() -> dict:
+                return {"result": {"passed": False}}
+          variables: []
+          outputs:
+            result: { type: object, children: null }
+
+      # ===== 出 Iteration1，分类 =====
+      - id: "1734000005001"
+        type: custom
+        position: { x: 2420, y: 282 }
+        data:
+          type: question-classifier
+          title: 按类目分路
+          desc: ""
+          query_variable_selector: ["1734000001001", "category"]
+          model:
+            provider: "langgenius/openai/openai"
+            name: "gpt-4o-mini"
+            mode: "chat"
+            completion_params: { temperature: 0 }
+          classes:
+            - { id: "1", name: "3C" }
+            - { id: "2", name: "服饰" }
+            - { id: "3", name: "家居" }
+          _targetBranches:
+            - { id: "1", name: "3C" }
+            - { id: "2", name: "服饰" }
+            - { id: "3", name: "家居" }
+          instruction: "根据类目字符串判定三分类"
+          vision: { enabled: false }
+
+      - id: "1734000006001"
+        type: custom
+        position: { x: 2720, y: 82 }
+        data:
+          type: llm
+          title: "3C 详情页"
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template:
+            - { role: system, text: "3C 品类详情页专家" }
+            - { role: user, text: "候选: {{#1734000004001.output#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734000006002"
+        type: custom
+        position: { x: 2720, y: 282 }
+        data:
+          type: llm
+          title: "服饰详情页"
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template:
+            - { role: system, text: "服饰品类文案专家" }
+            - { role: user, text: "候选: {{#1734000004001.output#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734000006003"
+        type: custom
+        position: { x: 2720, y: 482 }
+        data:
+          type: llm
+          title: "家居详情页"
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template:
+            - { role: system, text: "家居品类文案专家" }
+            - { role: user, text: "候选: {{#1734000004001.output#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734000007001"
+        type: custom
+        position: { x: 3020, y: 282 }
+        data:
+          type: variable-aggregator
+          title: 合流类目分支
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734000006001", "text"]
+            - ["1734000006002", "text"]
+            - ["1734000006003", "text"]
+
+      - id: "1734000008001"
+        type: custom
+        position: { x: 3320, y: 282 }
+        data:
+          type: code
+          title: 切分市场数组
+          desc: ""
+          code_language: python3
+          code: |
+            def main(markets: str) -> dict:
+                return {"list": [m.strip() for m in markets.split(",") if m.strip()]}
+          variables:
+            - { variable: markets, value_selector: ["1734000001001", "markets"] }
+          outputs:
+            list: { type: "array[string]", children: null }
+
+      # ===== Iteration #2: 遍历市场本地化 =====
+      - id: "1734000009001"
+        type: custom
+        position: { x: 3620, y: 282 }
+        data:
+          type: iteration
+          title: "Iter2: 市场本地化"
+          desc: ""
+          start_node_id: "1734000009001start"
+          iterator_selector: ["1734000008001", "list"]
+          iterator_input_type: "array[string]"
+          output_selector: ["1734000009005", "result"]
+          output_type: "array[object]"
+          is_parallel: true
+          parallel_nums: 5
+          error_handle_mode: terminated
+          flatten_output: false
+          width: 1100
+          height: 300
+        width: 1100
+        height: 300
+        zIndex: 1
+
+      - id: "1734000009001start"
+        type: custom-iteration-start
+        parentId: "1734000009001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734000009002"
+        type: custom
+        parentId: "1734000009001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 翻译
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000009001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.3 } }
+          prompt_template:
+            - { role: system, text: "翻译到目标市场语言" }
+            - { role: user, text: "市场: {{#1734000009001.item#}}\n文本: {{#1734000007001.output#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734000009003"
+        type: custom
+        parentId: "1734000009001"
+        position: { x: 320, y: 68 }
+        zIndex: 1002
+        data:
+          type: tool
+          title: 本地合规检查
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000009001"
+          provider_id: "compliance_checker"
+          provider_type: "api"
+          provider_name: "compliance_checker"
+          tool_name: "check"
+          tool_label: "Compliance Check"
+          tool_configurations: {}
+          tool_parameters:
+            market: { type: mixed, value: "{{#1734000009001.item#}}" }
+            text: { type: mixed, value: "{{#1734000009002.text#}}" }
+
+      - id: "1734000009004"
+        type: custom
+        parentId: "1734000009001"
+        position: { x: 540, y: 68 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 价格换算
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000009001"
+          code_language: python3
+          code: |
+            def main(market: str, budget: float) -> dict:
+                rates = {"US": 0.14, "JP": 21.0, "DE": 0.13, "UK": 0.11}
+                return {"price": round(budget * rates.get(market, 1.0), 2)}
+          variables:
+            - { variable: market, value_selector: ["1734000009001", "item"] }
+            - { variable: budget, value_selector: ["1734000001001", "budget"] }
+          outputs:
+            price: { type: number, children: null }
+
+      - id: "1734000009005"
+        type: custom
+        parentId: "1734000009001"
+        position: { x: 760, y: 68 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 打包市场 payload
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734000009001"
+          code_language: python3
+          code: |
+            def main(market, translated, compliance, price) -> dict:
+                return {"result": {"market": market, "text": translated, "compliance": compliance, "price": price}}
+          variables:
+            - { variable: market, value_selector: ["1734000009001", "item"] }
+            - { variable: translated, value_selector: ["1734000009002", "text"] }
+            - { variable: compliance, value_selector: ["1734000009003", "text"] }
+            - { variable: price, value_selector: ["1734000009004", "price"] }
+          outputs:
+            result: { type: object, children: null }
+
+      # ===== 出 Iter2，构建 payload =====
+      - id: "1734000010001"
+        type: custom
+        position: { x: 4820, y: 282 }
+        data:
+          type: code
+          title: 构建多语言 payload
+          desc: ""
+          code_language: python3
+          code: |
+            import json
+            def main(markets, skus) -> dict:
+                payload = {"markets": markets, "skus": skus}
+                return {"payload": payload, "payload_str": json.dumps(payload, ensure_ascii=False)}
+          variables:
+            - { variable: markets, value_selector: ["1734000009001", "output"] }
+            - { variable: skus, value_selector: ["1734000004001", "output"] }
+          outputs:
+            payload: { type: object, children: null }
+            payload_str: { type: string, children: null }
+
+      - id: "1734000011001"
+        type: custom
+        position: { x: 5120, y: 82 }
+        data:
+          type: http-request
+          title: 推送 Shopify
+          desc: ""
+          method: post
+          url: "https://api.shopify.com/products"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734000010001.payload_str#}}" }]
+          authorization: { type: api-key, config: { type: bearer, api_key: "TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734000011002"
+        type: custom
+        position: { x: 5120, y: 282 }
+        data:
+          type: http-request
+          title: 推送 Amazon
+          desc: ""
+          method: post
+          url: "https://api.amazon.com/products"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734000010001.payload_str#}}" }]
+          authorization: { type: api-key, config: { type: bearer, api_key: "TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734000011003"
+        type: custom
+        position: { x: 5120, y: 482 }
+        data:
+          type: http-request
+          title: 推送速卖通
+          desc: ""
+          method: post
+          url: "https://api.aliexpress.com/products"
+          headers: "Content-Type:application/json"
+          params: ""
+          body:
+            type: json
+            data: [{ id: "b", type: text, value: "{{#1734000010001.payload_str#}}" }]
+          authorization: { type: api-key, config: { type: bearer, api_key: "TOKEN" } }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734000012001"
+        type: custom
+        position: { x: 5420, y: 282 }
+        data:
+          type: variable-aggregator
+          title: 合流三平台
+          desc: ""
+          output_type: string
+          advanced_settings:
+            group_enabled: true
+            groups:
+              - { groupId: "g1", group_name: "shopify", output_type: string, variables: [["1734000011001", "body"]] }
+              - { groupId: "g2", group_name: "amazon", output_type: string, variables: [["1734000011002", "body"]] }
+              - { groupId: "g3", group_name: "aliexpress", output_type: string, variables: [["1734000011003", "body"]] }
+          variables:
+            - ["1734000011001", "body"]
+            - ["1734000011002", "body"]
+            - ["1734000011003", "body"]
+
+      - id: "1734000013001"
+        type: custom
+        position: { x: 5720, y: 282 }
+        data:
+          type: end
+          title: End
+          desc: ""
+          outputs:
+            - { variable: payload, value_selector: ["1734000010001", "payload"], value_type: object }
+            - { variable: shopify, value_selector: ["1734000012001", "shopify", "output"], value_type: string }
+            - { variable: amazon, value_selector: ["1734000012001", "amazon", "output"], value_type: string }
+            - { variable: aliexpress, value_selector: ["1734000012001", "aliexpress", "output"], value_type: string }
+
+    edges:
+      - { id: "e1", source: "1734000001001", sourceHandle: source, target: "1734000002001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e2", source: "1734000002001", sourceHandle: source, target: "1734000003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: code } }
+      - { id: "e3", source: "1734000003001", sourceHandle: source, target: "1734000004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e4", source: "1734000004001start", sourceHandle: source, target: "1734000004002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: iteration-start, targetType: http-request } }
+      - { id: "e5", source: "1734000004002", sourceHandle: source, target: "1734000004003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: http-request, targetType: llm } }
+      - { id: "e6", source: "1734000004003", sourceHandle: source, target: "1734000004004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: llm, targetType: if-else } }
+      - { id: "e7", source: "1734000004004", sourceHandle: "true", target: "1734000004005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: if-else, targetType: knowledge-retrieval } }
+      - { id: "e8", source: "1734000004004", sourceHandle: "false", target: "1734000004008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: if-else, targetType: code } }
+      - { id: "e9", source: "1734000004005", sourceHandle: source, target: "1734000004006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: knowledge-retrieval, targetType: parameter-extractor } }
+      - { id: "e10", source: "1734000004006", sourceHandle: source, target: "1734000004007", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000004001", sourceType: parameter-extractor, targetType: code } }
+      - { id: "e11", source: "1734000004001", sourceHandle: source, target: "1734000005001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: question-classifier } }
+      - { id: "e12", source: "1734000005001", sourceHandle: "1", target: "1734000006001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e13", source: "1734000005001", sourceHandle: "2", target: "1734000006002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e14", source: "1734000005001", sourceHandle: "3", target: "1734000006003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: question-classifier, targetType: llm } }
+      - { id: "e15", source: "1734000006001", sourceHandle: source, target: "1734000007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e16", source: "1734000006002", sourceHandle: source, target: "1734000007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e17", source: "1734000006003", sourceHandle: source, target: "1734000007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e18", source: "1734000007001", sourceHandle: source, target: "1734000008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: code } }
+      - { id: "e19", source: "1734000008001", sourceHandle: source, target: "1734000009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e20", source: "1734000009001start", sourceHandle: source, target: "1734000009002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000009001", sourceType: iteration-start, targetType: llm } }
+      - { id: "e21", source: "1734000009002", sourceHandle: source, target: "1734000009003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000009001", sourceType: llm, targetType: tool } }
+      - { id: "e22", source: "1734000009003", sourceHandle: source, target: "1734000009004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000009001", sourceType: tool, targetType: code } }
+      - { id: "e23", source: "1734000009004", sourceHandle: source, target: "1734000009005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734000009001", sourceType: code, targetType: code } }
+      - { id: "e24", source: "1734000009001", sourceHandle: source, target: "1734000010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: code } }
+      - { id: "e25", source: "1734000010001", sourceHandle: source, target: "1734000011001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: http-request } }
+      - { id: "e26", source: "1734000010001", sourceHandle: source, target: "1734000011002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: http-request } }
+      - { id: "e27", source: "1734000010001", sourceHandle: source, target: "1734000011003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: http-request } }
+      - { id: "e28", source: "1734000011001", sourceHandle: source, target: "1734000012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e29", source: "1734000011002", sourceHandle: source, target: "1734000012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e30", source: "1734000011003", sourceHandle: source, target: "1734000012001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e31", source: "1734000012001", sourceHandle: source, target: "1734000013001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: end } }
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.4

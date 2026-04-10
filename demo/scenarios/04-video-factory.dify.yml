@@ -1,0 +1,531 @@
+version: "0.6.0"
+kind: app
+app:
+  name: "视频内容工厂 - 多平台矩阵分发"
+  mode: workflow
+  icon: "\U0001F3AC"
+  icon_background: "#FFEAD5"
+  icon_type: emoji
+  description: "长视频 → 10 高光 → 双层 Iteration（高光生成资产 + 平台分发）→ 3路通知"
+  use_icon_as_answer_icon: false
+dependencies: []
+workflow:
+  environment_variables: []
+  conversation_variables: []
+  features:
+    file_upload: { enabled: false }
+    opening_statement: ""
+    retriever_resource: { enabled: false }
+    sensitive_word_avoidance: { enabled: false }
+    speech_to_text: { enabled: false }
+    suggested_questions: []
+    suggested_questions_after_answer: { enabled: false }
+    text_to_speech: { enabled: false }
+  graph:
+    nodes:
+      - id: "1734300001001"
+        type: custom
+        position: { x: 80, y: 282 }
+        data:
+          type: start
+          title: Start
+          desc: ""
+          variables:
+            - { variable: youtube_url, label: YouTube URL, type: url, required: true }
+            - { variable: platforms, label: 目标平台, type: paragraph, required: true, placeholder: "tiktok,bili,xhs,twitter,linkedin" }
+
+      - id: "1734300002001"
+        type: custom
+        position: { x: 380, y: 282 }
+        data:
+          type: http-request
+          title: 下载字幕
+          desc: ""
+          method: get
+          url: "https://api.yt-dlp.com/subtitles?url={{#1734300001001.youtube_url#}}"
+          headers: ""
+          params: ""
+          body: { type: none, data: [] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734300003001"
+        type: custom
+        position: { x: 680, y: 282 }
+        data:
+          type: code
+          title: 切分章节
+          desc: ""
+          code_language: python3
+          code: |
+            def main(subs: str) -> dict:
+                chunks = (subs or "").split("\n\n")
+                return {"chapters": [{"idx": i, "text": c} for i, c in enumerate(chunks)]}
+          variables:
+            - { variable: subs, value_selector: ["1734300002001", "body"] }
+          outputs:
+            chapters: { type: "array[object]", children: null }
+
+      - id: "1734300004001"
+        type: custom
+        position: { x: 980, y: 282 }
+        data:
+          type: llm
+          title: 提取 10 高光
+          desc: ""
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o", mode: "chat", completion_params: { temperature: 0.5 } }
+          prompt_template:
+            - { role: system, text: "从章节中提取 10 个高光片段，输出 JSON 数组" }
+            - { role: user, text: "{{#1734300003001.chapters#}}" }
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+          structured_output_enabled: true
+          structured_output:
+            schema:
+              type: object
+              properties:
+                highlights:
+                  type: "array[object]"
+                  items:
+                    type: object
+                    properties:
+                      title: { type: string, description: "高光标题" }
+                      start: { type: number, description: "开始秒" }
+                      end: { type: number, description: "结束秒" }
+                      summary: { type: string, description: "摘要" }
+                    required: ["title", "summary"]
+                    additionalProperties: false
+              required: ["highlights"]
+              additionalProperties: false
+
+      # ===== Iter1: 遍历高光生成资产 =====
+      - id: "1734300005001"
+        type: custom
+        position: { x: 1280, y: 282 }
+        data:
+          type: iteration
+          title: "Iter1: 高光资产"
+          desc: ""
+          start_node_id: "1734300005001start"
+          iterator_selector: ["1734300004001", "highlights"]
+          iterator_input_type: "array[object]"
+          output_selector: ["1734300005006", "result"]
+          output_type: "array[object]"
+          is_parallel: true
+          parallel_nums: 5
+          error_handle_mode: remove-abnormal-output
+          flatten_output: false
+          width: 1300
+          height: 300
+        width: 1300
+        height: 300
+        zIndex: 1
+
+      - id: "1734300005001start"
+        type: custom-iteration-start
+        parentId: "1734300005001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734300005002"
+        type: custom
+        parentId: "1734300005001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 写标题
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.8 } }
+          prompt_template: [{ role: system, text: "写爆款标题" }, { role: user, text: "{{#1734300005001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300005003"
+        type: custom
+        parentId: "1734300005001"
+        position: { x: 320, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 写描述
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template: [{ role: system, text: "写 100 字描述" }, { role: user, text: "{{#1734300005001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300005004"
+        type: custom
+        parentId: "1734300005001"
+        position: { x: 540, y: 68 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 封面 prompt
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300005001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.8 } }
+          prompt_template: [{ role: system, text: "生成 SD prompt" }, { role: user, text: "{{#1734300005001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300005005"
+        type: custom
+        parentId: "1734300005001"
+        position: { x: 760, y: 68 }
+        zIndex: 1002
+        data:
+          type: tool
+          title: SD 生图
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300005001"
+          provider_id: "stable_diffusion"
+          provider_type: api
+          provider_name: "stable_diffusion"
+          tool_name: "text2img"
+          tool_label: "SD"
+          tool_configurations: {}
+          tool_parameters:
+            prompt: { type: mixed, value: "{{#1734300005004.text#}}" }
+
+      - id: "1734300005006"
+        type: custom
+        parentId: "1734300005001"
+        position: { x: 980, y: 68 }
+        zIndex: 1002
+        data:
+          type: code
+          title: 打包资产
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300005001"
+          code_language: python3
+          code: |
+            def main(item, title, desc, cover) -> dict:
+                return {"result": {"item": item, "title": title, "desc": desc, "cover": cover}}
+          variables:
+            - { variable: item, value_selector: ["1734300005001", "item"] }
+            - { variable: title, value_selector: ["1734300005002", "text"] }
+            - { variable: desc, value_selector: ["1734300005003", "text"] }
+            - { variable: cover, value_selector: ["1734300005005", "text"] }
+          outputs:
+            result: { type: object, children: null }
+
+      - id: "1734300006001"
+        type: custom
+        position: { x: 2680, y: 282 }
+        data:
+          type: code
+          title: 切分平台数组
+          desc: ""
+          code_language: python3
+          code: |
+            def main(p: str) -> dict:
+                return {"list": [x.strip() for x in p.split(",") if x.strip()]}
+          variables:
+            - { variable: p, value_selector: ["1734300001001", "platforms"] }
+          outputs:
+            list: { type: "array[string]", children: null }
+
+      # ===== Iter2: 遍历平台分发 =====
+      - id: "1734300007001"
+        type: custom
+        position: { x: 2980, y: 282 }
+        data:
+          type: iteration
+          title: "Iter2: 平台分发"
+          desc: ""
+          start_node_id: "1734300007001start"
+          iterator_selector: ["1734300006001", "list"]
+          iterator_input_type: "array[string]"
+          output_selector: ["1734300007009", "result"]
+          output_type: "array[object]"
+          is_parallel: false
+          parallel_nums: 1
+          error_handle_mode: continue-on-error
+          flatten_output: false
+          width: 1600
+          height: 400
+        width: 1600
+        height: 400
+        zIndex: 1
+
+      - id: "1734300007001start"
+        type: custom-iteration-start
+        parentId: "1734300007001"
+        draggable: false
+        selectable: false
+        position: { x: 24, y: 68 }
+        zIndex: 1002
+        data: { type: iteration-start, title: "", desc: "", isInIteration: true }
+
+      - id: "1734300007002"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 100, y: 68 }
+        zIndex: 1002
+        data:
+          type: question-classifier
+          title: 选模板
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          query_variable_selector: ["1734300007001", "item"]
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0 } }
+          classes:
+            - { id: "1", name: 图文 }
+            - { id: "2", name: 短视频 }
+            - { id: "3", name: 长推文 }
+          _targetBranches:
+            - { id: "1", name: 图文 }
+            - { id: "2", name: 短视频 }
+            - { id: "3", name: 长推文 }
+          vision: { enabled: false }
+
+      - id: "1734300007003"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 340, y: 0 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 图文改写
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template: [{ role: system, text: "改写为图文平台调性" }, { role: user, text: "{{#1734300005001.output#}}\n平台: {{#1734300007001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300007004"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 340, y: 100 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 短视频改写
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template: [{ role: system, text: "改写为短视频脚本" }, { role: user, text: "{{#1734300005001.output#}}\n平台: {{#1734300007001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300007005"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 340, y: 200 }
+        zIndex: 1002
+        data:
+          type: llm
+          title: 长推文改写
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          model: { provider: "langgenius/openai/openai", name: "gpt-4o-mini", mode: "chat", completion_params: { temperature: 0.7 } }
+          prompt_template: [{ role: system, text: "改写为长推文" }, { role: user, text: "{{#1734300005001.output#}}\n平台: {{#1734300007001.item#}}" }]
+          context: { enabled: false, variable_selector: [] }
+          vision: { enabled: false }
+
+      - id: "1734300007006"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 580, y: 100 }
+        zIndex: 1002
+        data:
+          type: variable-aggregator
+          title: 模板合流
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          output_type: string
+          variables:
+            - ["1734300007003", "text"]
+            - ["1734300007004", "text"]
+            - ["1734300007005", "text"]
+
+      - id: "1734300007007"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 820, y: 100 }
+        zIndex: 1002
+        data:
+          type: if-else
+          title: 需要 BGM?
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          cases:
+            - case_id: "true"
+              id: "true"
+              logical_operator: and
+              conditions:
+                - { id: c1, varType: string, comparison_operator: contains, value: "tiktok", variable_selector: ["1734300007001", "item"] }
+
+      - id: "1734300007008"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 1060, y: 30 }
+        zIndex: 1002
+        data:
+          type: tool
+          title: 音乐 API
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          provider_id: "music_gen"
+          provider_type: api
+          provider_name: "music_gen"
+          tool_name: "generate"
+          tool_label: "Music"
+          tool_configurations: {}
+          tool_parameters:
+            mood: { type: mixed, value: "energetic" }
+
+      - id: "1734300007009"
+        type: custom
+        parentId: "1734300007001"
+        position: { x: 1300, y: 100 }
+        zIndex: 1002
+        data:
+          type: http-request
+          title: 发布
+          desc: ""
+          isInIteration: true
+          iteration_id: "1734300007001"
+          method: post
+          url: "https://api.{{#1734300007001.item#}}.com/publish"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734300007006.output#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      # 出 Iter2: 3 路并行
+      - id: "1734300008001"
+        type: custom
+        position: { x: 4680, y: 82 }
+        data:
+          type: http-request
+          title: 写飞书多维表
+          desc: ""
+          method: post
+          url: "https://open.feishu.cn/bitable"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "{{#1734300007001.output#}}" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734300008002"
+        type: custom
+        position: { x: 4680, y: 282 }
+        data:
+          type: http-request
+          title: Slack 通知
+          desc: ""
+          method: post
+          url: "https://hooks.slack.com/services/XXX"
+          headers: "Content-Type:application/json"
+          params: ""
+          body: { type: json, data: [{ id: b, type: text, value: "已发布" }] }
+          authorization: { type: no-auth, config: null }
+          timeout: { max_connect_timeout: 0, max_read_timeout: 0, max_write_timeout: 0 }
+          ssl_verify: true
+          variables: []
+
+      - id: "1734300008003"
+        type: custom
+        position: { x: 4680, y: 482 }
+        data:
+          type: code
+          title: 生成周报数据
+          desc: ""
+          code_language: python3
+          code: |
+            def main(results) -> dict:
+                return {"report": {"count": len(results) if isinstance(results, list) else 0}}
+          variables:
+            - { variable: results, value_selector: ["1734300007001", "output"] }
+          outputs:
+            report: { type: object, children: null }
+
+      - id: "1734300009001"
+        type: custom
+        position: { x: 4980, y: 282 }
+        data:
+          type: variable-aggregator
+          title: 合流
+          desc: ""
+          output_type: string
+          variables:
+            - ["1734300008001", "body"]
+            - ["1734300008002", "body"]
+            - ["1734300008003", "report"]
+
+      - id: "1734300010001"
+        type: custom
+        position: { x: 5280, y: 282 }
+        data:
+          type: end
+          title: End
+          desc: ""
+          outputs:
+            - { variable: assets, value_selector: ["1734300005001", "output"], value_type: "array[object]" }
+            - { variable: publish_results, value_selector: ["1734300007001", "output"], value_type: "array[object]" }
+            - { variable: notification, value_selector: ["1734300009001", "output"], value_type: string }
+
+    edges:
+      - { id: "e1", source: "1734300001001", sourceHandle: source, target: "1734300002001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: start, targetType: http-request } }
+      - { id: "e2", source: "1734300002001", sourceHandle: source, target: "1734300003001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: code } }
+      - { id: "e3", source: "1734300003001", sourceHandle: source, target: "1734300004001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: llm } }
+      - { id: "e4", source: "1734300004001", sourceHandle: source, target: "1734300005001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: llm, targetType: iteration } }
+      - { id: "e5", source: "1734300005001start", sourceHandle: source, target: "1734300005002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300005001", sourceType: iteration-start, targetType: llm } }
+      - { id: "e6", source: "1734300005002", sourceHandle: source, target: "1734300005003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300005001", sourceType: llm, targetType: llm } }
+      - { id: "e7", source: "1734300005003", sourceHandle: source, target: "1734300005004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300005001", sourceType: llm, targetType: llm } }
+      - { id: "e8", source: "1734300005004", sourceHandle: source, target: "1734300005005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300005001", sourceType: llm, targetType: tool } }
+      - { id: "e9", source: "1734300005005", sourceHandle: source, target: "1734300005006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300005001", sourceType: tool, targetType: code } }
+      - { id: "e10", source: "1734300005001", sourceHandle: source, target: "1734300006001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: code } }
+      - { id: "e11", source: "1734300006001", sourceHandle: source, target: "1734300007001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: iteration } }
+      - { id: "e12", source: "1734300007001start", sourceHandle: source, target: "1734300007002", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: iteration-start, targetType: question-classifier } }
+      - { id: "e13", source: "1734300007002", sourceHandle: "1", target: "1734300007003", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: question-classifier, targetType: llm } }
+      - { id: "e14", source: "1734300007002", sourceHandle: "2", target: "1734300007004", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: question-classifier, targetType: llm } }
+      - { id: "e15", source: "1734300007002", sourceHandle: "3", target: "1734300007005", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: question-classifier, targetType: llm } }
+      - { id: "e16", source: "1734300007003", sourceHandle: source, target: "1734300007006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e17", source: "1734300007004", sourceHandle: source, target: "1734300007006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e18", source: "1734300007005", sourceHandle: source, target: "1734300007006", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: llm, targetType: variable-aggregator } }
+      - { id: "e19", source: "1734300007006", sourceHandle: source, target: "1734300007007", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: variable-aggregator, targetType: if-else } }
+      - { id: "e20", source: "1734300007007", sourceHandle: "true", target: "1734300007008", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: if-else, targetType: tool } }
+      - { id: "e21", source: "1734300007007", sourceHandle: "false", target: "1734300007009", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: if-else, targetType: http-request } }
+      - { id: "e22", source: "1734300007008", sourceHandle: source, target: "1734300007009", targetHandle: target, type: custom, zIndex: 1002, data: { isInIteration: true, iteration_id: "1734300007001", sourceType: tool, targetType: http-request } }
+      - { id: "e23", source: "1734300007001", sourceHandle: source, target: "1734300008001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: http-request } }
+      - { id: "e24", source: "1734300007001", sourceHandle: source, target: "1734300008002", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: http-request } }
+      - { id: "e25", source: "1734300007001", sourceHandle: source, target: "1734300008003", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: iteration, targetType: code } }
+      - { id: "e26", source: "1734300008001", sourceHandle: source, target: "1734300009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e27", source: "1734300008002", sourceHandle: source, target: "1734300009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: http-request, targetType: variable-aggregator } }
+      - { id: "e28", source: "1734300008003", sourceHandle: source, target: "1734300009001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: code, targetType: variable-aggregator } }
+      - { id: "e29", source: "1734300009001", sourceHandle: source, target: "1734300010001", targetHandle: target, type: custom, zIndex: 0, data: { sourceType: variable-aggregator, targetType: end } }
+
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.4
